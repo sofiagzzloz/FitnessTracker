@@ -4,13 +4,19 @@ from sqlmodel import Session, select
 from datetime import date as date_cls
 
 from ..db import get_session
-from ..models import Workout
+from ..models import Workout, Exercise
 from ..schemas import WorkoutCreate, WorkoutRead, WorkoutUpdate
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
 
 @router.post("", response_model=WorkoutRead, status_code=201)
 def create_workout(payload: WorkoutCreate, session: Session = Depends(get_session)):
+    # validate exercise exists
+    ex = session.get(Exercise, payload.exercise_id)
+    if not ex:
+        raise HTTPException(status_code=400, detail="Invalid exercise_id")
+
+    # basic non-negative checks
     for fld in ("sets", "reps", "weight_kg", "distance_km"):
         val = getattr(payload, fld)
         if val is not None and val < 0:
@@ -20,52 +26,42 @@ def create_workout(payload: WorkoutCreate, session: Session = Depends(get_sessio
     session.add(w)
     session.commit()
     session.refresh(w)
-    return w
+
+    # return enriched response
+    return WorkoutRead(
+        **w.model_dump(),
+        exercise_name=ex.name,
+        exercise_category=ex.category,
+    )
 
 @router.get("", response_model=List[WorkoutRead])
-def list_workouts(
-    session: Session = Depends(get_session),
-    exercise: Optional[str] = Query(None, description="Filter by exact exercise"),
-    on_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="YYYY-MM-DD (inclusive)"),
-):
-    stmt = select(Workout)
+def list_workouts(session: Session = Depends(get_session)):
+    workouts = session.exec(select(Workout)).all()
+    out = []
+    for w in workouts:
+        ex = session.get(Exercise, w.exercise_id)
+        out.append(
+            WorkoutRead(
+                **w.model_dump(),
+                exercise_name=ex.name,
+                exercise_category=ex.category,
+            )
+        )
+    return out
 
-    if exercise:
-        stmt = stmt.where(Workout.exercise == exercise)
 
-    # single date
-    if on_date:
-        try:
-            d = date_cls.fromisoformat(on_date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid on_date (YYYY-MM-DD)")
-        stmt = stmt.where(Workout.date == d)
-
-    # date range
-    if start_date:
-        try:
-            sd = date_cls.fromisoformat(start_date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid start_date (YYYY-MM-DD)")
-        stmt = stmt.where(Workout.date >= sd)
-    if end_date:
-        try:
-            ed = date_cls.fromisoformat(end_date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid end_date (YYYY-MM-DD)")
-        stmt = stmt.where(Workout.date <= ed)
-
-    return session.exec(stmt).all()
 
 @router.get("/{workout_id}", response_model=WorkoutRead)
 def get_workout(workout_id: int, session: Session = Depends(get_session)):
     w = session.get(Workout, workout_id)
     if not w:
         raise HTTPException(status_code=404, detail="Workout not found")
-    return w
-
+    ex = session.get(Exercise, w.exercise_id)
+    return WorkoutRead(
+        **w.model_dump(),
+        exercise_name=ex.name,
+        exercise_category=ex.category,
+    )
 
 @router.put("/{workout_id}", response_model=WorkoutRead)
 def update_workout(workout_id: int, payload: WorkoutUpdate, session: Session = Depends(get_session)):
