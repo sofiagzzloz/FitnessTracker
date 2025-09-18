@@ -1,0 +1,49 @@
+body
+{
+  font-family: system-ui, -apple-system, Arial, sans-serif; margin:0; padding: 24px; background:#fafafa; 
+}
+
+.container
+{ 
+  max-width: 900px; margin: 0 auto;
+}
+
+.card
+{
+  background: white; border: 1px solid #eee; border-radius: 8px; padding: 16px; margin: 16px 0; 
+}
+
+.row 
+{
+  display: flex; gap: 12px; align-items: center; margin: 8px 0; 
+}
+
+.row.grid 
+{
+  display:grid; grid-template-columns: repeat(6, auto); gap: 8px; align-items: center; 
+}
+
+label
+{ 
+  min-width: 110px; 
+}
+
+input, select, button 
+{
+  padding: 6px 8px; 
+}
+
+table
+{ 
+  width: 100%; border-collapse: collapse; margin-top: 12px; 
+}
+
+th, td 
+{ 
+  border-bottom: 1px solid #ececec; padding: 8px; text-align: left; 
+}
+
+.filters 
+{
+  display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap: wrap; 
+}

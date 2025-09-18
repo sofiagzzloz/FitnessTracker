@@ -55,3 +55,5 @@ class ExerciseUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
     default_unit: Optional[str] = None
+
+

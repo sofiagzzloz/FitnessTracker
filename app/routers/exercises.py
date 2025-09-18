@@ -10,7 +10,6 @@ router = APIRouter(prefix="/exercises", tags=["exercises"])
 
 @router.post("", response_model=ExerciseRead, status_code=201)
 def create_exercise(payload: ExerciseCreate, session: Session = Depends(get_session)):
-    # optional: enforce unique name
     exists = session.exec(select(Exercise).where(Exercise.name == payload.name)).first()
     if exists:
         raise HTTPException(status_code=409, detail="Exercise with that name already exists")
