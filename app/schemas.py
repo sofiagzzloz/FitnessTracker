@@ -4,15 +4,25 @@ from pydantic import BaseModel, Field
 
 class WorkoutCreate(BaseModel):
     date: date
-    exercise: str = Field(min_length=1)
+    exercise_id: int
     sets: Optional[int] = None
     reps: Optional[int] = None
     weight_kg: Optional[float] = None
     distance_km: Optional[float] = None
     notes: Optional[str] = None
 
-class WorkoutRead(WorkoutCreate):
+class WorkoutRead(BaseModel):
     id: int
+    date: date
+    exercise_id: int
+    sets: Optional[int] = None
+    reps: Optional[int] = None
+    weight_kg: Optional[float] = None
+    distance_km: Optional[float] = None
+    notes: Optional[str] = None
+
+    exercise_name: str
+    exercise_category: Optional[str] = None
 
 class WorkoutUpdate(BaseModel):
     date: Optional[date]
