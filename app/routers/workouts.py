@@ -2,6 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from datetime import date as date_cls
+from collections import defaultdict
 
 from ..db import get_session
 from ..models import Workout, Exercise
@@ -70,13 +71,33 @@ def update_workout(workout_id: int, payload: WorkoutUpdate, session: Session = D
         raise HTTPException(status_code=404, detail="Workout not found")
 
     data = payload.model_dump(exclude_unset=True)
+
+    # Validate non-negative fields if provided
+    for fld in ("sets", "reps", "weight_kg", "distance_km"):
+        if fld in data and data[fld] is not None and data[fld] < 0:
+            raise HTTPException(status_code=400, detail=f"{fld} must be >= 0")
+
+    # If exercise_id changes, validate it exists
+    if "exercise_id" in data and data["exercise_id"] is not None:
+        ex_new = session.get(Exercise, data["exercise_id"])
+        if not ex_new:
+            raise HTTPException(status_code=400, detail="Invalid exercise_id")
+
+    
     for k, v in data.items():
         setattr(w, k, v)
 
     session.add(w)
     session.commit()
     session.refresh(w)
-    return w
+
+    
+    ex = session.get(Exercise, w.exercise_id)
+    return WorkoutRead(
+        **w.model_dump(),
+        exercise_name=ex.name,
+        exercise_category=ex.category,
+    )
 
 @router.delete("/{workout_id}", status_code=204)
 def delete_workout(workout_id: int, session: Session = Depends(get_session)):
@@ -87,3 +108,25 @@ def delete_workout(workout_id: int, session: Session = Depends(get_session)):
     session.commit()
     return None
 
+
+@router.get("/stats")
+def workout_stats(session: Session = Depends(get_session)):
+    workouts = session.exec(select(Workout)).all()
+    by_ex = defaultdict(lambda: {"count": 0, "total_volume": 0.0, "total_distance_km": 0.0})
+
+    for w in workouts:
+        ex = session.get(Exercise, w.exercise_id)
+        key = ex.name if ex else f"id:{w.exercise_id}"
+        by_ex[key]["count"] += 1
+        # volume = sets * reps * weight_kg (if provided)
+        if w.sets and w.reps and w.weight_kg:
+            by_ex[key]["total_volume"] += float(w.sets * w.reps * w.weight_kg)
+        if w.distance_km:
+            by_ex[key]["total_distance_km"] += float(w.distance_km)
+
+    return {
+        "total_workouts": len(workouts),
+        "by_exercise": [
+            {"exercise": k, **v} for k, v in sorted(by_ex.items())
+        ],
+    }
