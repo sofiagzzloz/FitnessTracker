@@ -127,7 +127,7 @@ def delete_workout(workout_id: int, session: Session = Depends(get_session)):
     session.commit()
     return None
 
-
+# first i need to do the updates so this will be for later!!
 @router.get("/stats")
 def workout_stats(session: Session = Depends(get_session)):
     workouts = session.exec(select(Workout)).all()
