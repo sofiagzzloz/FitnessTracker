@@ -36,20 +36,39 @@ def create_workout(payload: WorkoutCreate, session: Session = Depends(get_sessio
     )
 
 @router.get("", response_model=List[WorkoutRead])
-def list_workouts(session: Session = Depends(get_session)):
-    workouts = session.exec(select(Workout)).all()
+def list_workouts(
+    session: Session = Depends(get_session),
+    exercise: Optional[str] = Query(None, description="Exact exercise name"),
+    category: Optional[str] = Query(None, description="Exercise category"),
+    on_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD (inclusive)"),
+):
+    stmt = select(Workout)
+    from datetime import date as date_cls
+    if on_date:
+        d = date_cls.fromisoformat(on_date); stmt = stmt.where(Workout.date == d)
+    if start_date:
+        sd = date_cls.fromisoformat(start_date); stmt = stmt.where(Workout.date >= sd)
+    if end_date:
+        ed = date_cls.fromisoformat(end_date); stmt = stmt.where(Workout.date <= ed)
+
+    items = session.exec(stmt).all()
     out = []
-    for w in workouts:
+    for w in items:
         ex = session.get(Exercise, w.exercise_id)
+        if exercise and (not ex or ex.name != exercise):
+            continue
+        if category and (not ex or ex.category != category):
+            continue
         out.append(
             WorkoutRead(
                 **w.model_dump(),
-                exercise_name=ex.name,
-                exercise_category=ex.category,
+                exercise_name=ex.name if ex else "",
+                exercise_category=ex.category if ex else None,
             )
         )
     return out
-
 
 
 @router.get("/{workout_id}", response_model=WorkoutRead)
@@ -130,3 +149,4 @@ def workout_stats(session: Session = Depends(get_session)):
             {"exercise": k, **v} for k, v in sorted(by_ex.items())
         ],
     }
+
