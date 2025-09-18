@@ -25,13 +25,23 @@ class WorkoutRead(BaseModel):
     exercise_category: Optional[str] = None
 
 class WorkoutUpdate(BaseModel):
-    date: Optional[date]
-    exercise: Optional[int] = None
+    date: Optional[date] = None 
+    exercise_id: Optional[int] = None
     sets: Optional[int] = None
     reps: Optional[int] = None
     weight_kg: Optional[float] = None
     distance_km: Optional[float] = None
     notes: Optional[str] = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"sets": 3, "reps": 10},
+                {"weight_kg": 10},
+                {"exercise_id": 5, "notes": "bigger"}
+            ]
+        }
+    }
 
 class ExerciseCreate(BaseModel):
     name: str = Field(min_length=1)
