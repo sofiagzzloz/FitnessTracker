@@ -26,7 +26,7 @@ class WorkoutRead(BaseModel):
 
 class WorkoutUpdate(BaseModel):
     date: Optional[date]
-    exercise: Optional[str] = None
+    exercise: Optional[int] = None
     sets: Optional[int] = None
     reps: Optional[int] = None
     weight_kg: Optional[float] = None

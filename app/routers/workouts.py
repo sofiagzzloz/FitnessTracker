@@ -16,7 +16,7 @@ def create_workout(payload: WorkoutCreate, session: Session = Depends(get_sessio
     if not ex:
         raise HTTPException(status_code=400, detail="Invalid exercise_id")
 
-    # non-negative checks
+    # basic non-negative checks
     for fld in ("sets", "reps", "weight_kg", "distance_km"):
         val = getattr(payload, fld)
         if val is not None and val < 0:
@@ -26,22 +26,29 @@ def create_workout(payload: WorkoutCreate, session: Session = Depends(get_sessio
     session.add(w)
     session.commit()
     session.refresh(w)
-    return w
+
+    # return enriched response
+    return WorkoutRead(
+        **w.model_dump(),
+        exercise_name=ex.name,
+        exercise_category=ex.category,
+    )
 
 @router.get("", response_model=List[WorkoutRead])
 def list_workouts(session: Session = Depends(get_session)):
     workouts = session.exec(select(Workout)).all()
-    result = []
+    out = []
     for w in workouts:
         ex = session.get(Exercise, w.exercise_id)
-        result.append(
+        out.append(
             WorkoutRead(
-                **w.__dict__,
+                **w.model_dump(),
                 exercise_name=ex.name,
-                exercise_category=ex.category
+                exercise_category=ex.category,
             )
         )
-    return result
+    return out
+
 
 
 @router.get("/{workout_id}", response_model=WorkoutRead)
@@ -51,9 +58,9 @@ def get_workout(workout_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Workout not found")
     ex = session.get(Exercise, w.exercise_id)
     return WorkoutRead(
-        **w.__dict__,
+        **w.model_dump(),
         exercise_name=ex.name,
-        exercise_category=ex.category
+        exercise_category=ex.category,
     )
 
 @router.put("/{workout_id}", response_model=WorkoutRead)
