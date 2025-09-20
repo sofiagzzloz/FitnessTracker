@@ -10,6 +10,12 @@ from ..schemas import WorkoutCreate, WorkoutRead, WorkoutUpdate
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
 
+def _parse_date_or_400(s: str, field: str) -> date_cls:
+    try:
+        return date_cls.fromisoformat(s)
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Invalid {field}: {s}. Use YYYY-MM-DD")
+
 @router.post("", response_model=WorkoutRead, status_code=201)
 def create_workout(payload: WorkoutCreate, session: Session = Depends(get_session)):
     # validate exercise exists
@@ -28,7 +34,6 @@ def create_workout(payload: WorkoutCreate, session: Session = Depends(get_sessio
     session.commit()
     session.refresh(w)
 
-    # return enriched response
     return WorkoutRead(
         **w.model_dump(),
         exercise_name=ex.name,
@@ -45,22 +50,30 @@ def list_workouts(
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD (inclusive)"),
 ):
     stmt = select(Workout)
-    from datetime import date as date_cls
+
     if on_date:
-        d = date_cls.fromisoformat(on_date); stmt = stmt.where(Workout.date == d)
+        d = _parse_date_or_400(on_date, "on_date")
+        stmt = stmt.where(Workout.date == d)
     if start_date:
-        sd = date_cls.fromisoformat(start_date); stmt = stmt.where(Workout.date >= sd)
+        sd = _parse_date_or_400(start_date, "start_date")
+        stmt = stmt.where(Workout.date >= sd)
     if end_date:
-        ed = date_cls.fromisoformat(end_date); stmt = stmt.where(Workout.date <= ed)
+        ed = _parse_date_or_400(end_date, "end_date")
+        stmt = stmt.where(Workout.date <= ed)
 
     items = session.exec(stmt).all()
     out = []
     for w in items:
         ex = session.get(Exercise, w.exercise_id)
-        if exercise and (not ex or ex.name != exercise):
+
+        # case-insensitive
+        if exercise and (not ex or exercise.lower() not in ex.name.lower()):
             continue
-        if category and (not ex or ex.category != category):
+
+        # case-insensitive
+        if category and (not ex or not ex.category or category.lower() not in ex.category.lower()):
             continue
+
         out.append(
             WorkoutRead(
                 **w.model_dump(),
@@ -70,7 +83,6 @@ def list_workouts(
         )
     return out
 
-
 @router.get("/{workout_id}", response_model=WorkoutRead)
 def get_workout(workout_id: int, session: Session = Depends(get_session)):
     w = session.get(Workout, workout_id)
@@ -79,8 +91,8 @@ def get_workout(workout_id: int, session: Session = Depends(get_session)):
     ex = session.get(Exercise, w.exercise_id)
     return WorkoutRead(
         **w.model_dump(),
-        exercise_name=ex.name,
-        exercise_category=ex.category,
+        exercise_name=ex.name if ex else "",
+        exercise_category=ex.category if ex else None,
     )
 
 @router.put("/{workout_id}", response_model=WorkoutRead)
@@ -102,7 +114,6 @@ def update_workout(workout_id: int, payload: WorkoutUpdate, session: Session = D
         if not ex_new:
             raise HTTPException(status_code=400, detail="Invalid exercise_id")
 
-    
     for k, v in data.items():
         setattr(w, k, v)
 
@@ -110,12 +121,11 @@ def update_workout(workout_id: int, payload: WorkoutUpdate, session: Session = D
     session.commit()
     session.refresh(w)
 
-    
     ex = session.get(Exercise, w.exercise_id)
     return WorkoutRead(
         **w.model_dump(),
-        exercise_name=ex.name,
-        exercise_category=ex.category,
+        exercise_name=ex.name if ex else "",
+        exercise_category=ex.category if ex else None,
     )
 
 @router.delete("/{workout_id}", status_code=204)
@@ -149,4 +159,3 @@ def workout_stats(session: Session = Depends(get_session)):
             {"exercise": k, **v} for k, v in sorted(by_ex.items())
         ],
     }
-
