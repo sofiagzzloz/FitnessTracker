@@ -23,7 +23,7 @@ class WorkoutSession(SQLModel, table=True):
     date: date
     title: Optional[str] = None
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=date.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class WorkoutItem(SQLModel, table=True):
