@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 class WorkoutCreate(BaseModel):
@@ -56,4 +56,31 @@ class ExerciseUpdate(BaseModel):
     category: Optional[str] = None
     default_unit: Optional[str] = None
 
+class SessionCreate(BaseModel):
+    date: date
+    title: Optional[str] = None
+    notes: Optional[str] = None
 
+class SessionRead(BaseModel):
+    id: int
+    date: date
+    title: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+class SessionItemCreate(BaseModel):
+    exercise_id: int
+    notes: Optional[str] = None
+    order_index: Optional[int] = None
+
+class SessionItemRead(BaseModel):
+    id: int
+    session_id: int
+    exercise_id: int
+    notes: Optional[str] = None
+    order_index: Optional[int] = None
+    exercise_name: str
+    exercise_category: Optional[str] = None
+
+    
