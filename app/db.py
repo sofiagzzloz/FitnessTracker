@@ -1,12 +1,15 @@
 from sqlmodel import SQLModel, create_engine, Session
-import os
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
+# Always use fitness.db unless DATABASE_URL override is set
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///fitness.db")
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
 engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 
+# Enforce foreign keys for SQLite
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_conn, _):
     try:
