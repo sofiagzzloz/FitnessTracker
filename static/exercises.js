@@ -5,7 +5,7 @@ function debounce(fn, ms=200){
   let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
 }
 
-let _browseState = { muscle: '', limit: 12, offset: 0, loading: false };
+let _browseState = { muscle: '', limit: 12, offset: 0, loading: false, hasMore: true };
 
 // --- backend calls ---
 async function searchExternal(q) {
@@ -107,6 +107,8 @@ function attachExploreHandlers() {
     return;
   }
 
+  out.innerHTML = '<p class="hint">Type a name to search WGER.</p>';
+
   const run = async () => {
     const q = (input.value || '').trim();
     if (!q) { out.innerHTML = '<p class="hint">Type something to search.</p>'; return; }
@@ -166,26 +168,18 @@ function wireLocalFilters() {
   if (cat) cat.addEventListener('input', debounce(fetchLocalExercises, 250));
 }
 
-// --- boot ---
-document.addEventListener('DOMContentLoaded', () => {
-  attachExploreHandlers();
-  wireLocalFilters();
-  fetchLocalExercises(); // initial load of your local library
-});
-
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.ex-del');
   if (!btn) return;
   const id = btn.getAttribute('data-id');
   if (!id) return;
-  const ok = confirm('Delete this exercise? This will fail if it is used in a workout or session.');
+  const ok = confirm('Delete this exercise? It will also be removed from any workouts or logged sessions.');
   if (!ok) return;
 
   try {
     await deleteExercise(id);
-    // remove row or refresh the whole list
-    const tr = document.querySelector(`#ex-table tbody tr[data-id="${id}"]`);
-    tr && tr.remove();
+    // refresh the list so ordering/filtering stays accurate
+    await fetchLocalExercises();
   } catch (err) {
     console.error(err);
     alert(err.message || 'Could not delete (it may be used by a workout/session).');
@@ -210,11 +204,24 @@ async function fetchMuscles() {
 
 async function browseExternal(reset=false) {
   if (_browseState.loading) return;
-  _browseState.loading = true;
   const cont = el('browse-results');
-  cont.innerHTML = cont.innerHTML || '<p class="hint">Loading…</p>';
+  const moreBtn = el('browse-more');
+  if (!cont) return;
 
-  if (reset) _browseState.offset = 0;
+  _browseState.loading = true;
+
+  if (reset) {
+    _browseState.offset = 0;
+    _browseState.hasMore = true;
+    cont.innerHTML = '<p class="hint">Loading…</p>';
+  } else if (!cont.innerHTML.trim()) {
+    cont.innerHTML = '<p class="hint">Loading…</p>';
+  }
+
+  if (moreBtn) {
+    moreBtn.disabled = true;
+    moreBtn.textContent = 'Loading…';
+  }
 
   const params = new URLSearchParams();
   if (_browseState.muscle) params.set('muscle', _browseState.muscle);
@@ -225,14 +232,35 @@ async function browseExternal(reset=false) {
     const res = await fetch(`/api/external/exercises/browse?${params.toString()}`);
     if (!res.ok) throw new Error(`Browse failed ${res.status}`);
     const data = await res.json();
-    const items = data.items || [];
+    const items = Array.isArray(data.items) ? data.items : [];
+
     if (reset) cont.innerHTML = '';
 
     renderBrowseResults(items, !!reset);
-    _browseState.offset = data.next_offset ?? (_browseState.offset + _browseState.limit);
+
+    const next = data.next_offset;
+    const hasMore = data.has_more ?? (typeof next === 'number');
+    _browseState.hasMore = Boolean(hasMore);
+    if (typeof next === 'number') {
+      _browseState.offset = next;
+    }
+
+    if (moreBtn) {
+      if (_browseState.hasMore) {
+        moreBtn.disabled = false;
+        moreBtn.textContent = 'Load more';
+      } else {
+        moreBtn.disabled = true;
+        moreBtn.textContent = 'No more results';
+      }
+    }
   } catch (err) {
     console.error(err);
     cont.innerHTML = `<p class="hint">Error: ${err.message || err}</p>`;
+    if (moreBtn) {
+      moreBtn.disabled = false;
+      moreBtn.textContent = 'Load more';
+    }
   } finally {
     _browseState.loading = false;
   }
@@ -242,7 +270,7 @@ function renderBrowseResults(items, firstPage) {
   const cont = el('browse-results');
   if (!cont) return;
   if (firstPage && !items.length) {
-    cont.innerHTML = '<p class="hint">No items found.</p>';
+    cont.innerHTML = '<p class="hint">No exercises matched that filter yet.</p>';
     return;
   }
   items.forEach((item, i) => {
@@ -283,10 +311,16 @@ function attachBrowseHandlers() {
   const sel = el('browse-muscle');
   const btn = el('browse-btn');
   const more = el('browse-more');
-  if (!sel || !btn || !more) return;
+  const cont = el('browse-results');
+  if (!sel || !btn || !more || !cont) return;
+
+  if (!cont.innerHTML.trim()) {
+    cont.innerHTML = '<p class="hint">Pick a muscle or search to load exercises from WGER.</p>';
+  }
 
   sel.addEventListener('change', () => {
     _browseState.muscle = sel.value || '';
+    browseExternal(true);
   });
 
   btn.addEventListener('click', () => {
@@ -299,13 +333,15 @@ function attachBrowseHandlers() {
 
   // init on load
   _browseState.muscle = sel.value || '';
+  more.disabled = true;
+  more.textContent = 'Loading…';
   browseExternal(true);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   attachExploreHandlers();
   wireLocalFilters();
-  fetchLocalExercises();
-  fetchMuscles();
+  await fetchLocalExercises();
+  await fetchMuscles();
   attachBrowseHandlers();
 });

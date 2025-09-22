@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 
 WGER_API = "https://wger.de/api/v2"
@@ -87,7 +89,18 @@ async def search_wger(query: str, limit: int = 20) -> list[dict]:
 
     return out
 
-async def browse_wger(limit: int = 20, offset: int = 0, muscle: str | None = None) -> list[dict]:
+async def _fetch_exercise_detail(client: httpx.AsyncClient, ex_id: int) -> dict:
+    try:
+        e_res = await client.get(f"{WGER_API}/exercise/{ex_id}/")
+        e_res.raise_for_status()
+        return e_res.json()
+    except httpx.HTTPError:
+        return {}
+
+
+async def browse_wger(
+    limit: int = 20, offset: int = 0, muscle: str | None = None
+) -> tuple[list[dict], bool]:
     """
     Browse English exercise names with pagination. Optional 'muscle' filters by
     primary/secondary muscle slugs from the exercise detail endpoint.
@@ -106,7 +119,9 @@ async def browse_wger(limit: int = 20, offset: int = 0, muscle: str | None = Non
         seen: set[int] = set()
         matches: list[dict] = []
 
-        while len(matches) < offset + limit:
+        target_count = offset + limit + 1  # fetch one extra to know if there's another page
+
+        while len(matches) < target_count:
             t_res = await client.get(
                 f"{WGER_API}/exercise-translation/",
                 params={"language": 2, "limit": page_size, "offset": api_offset},
@@ -118,6 +133,7 @@ async def browse_wger(limit: int = 20, offset: int = 0, muscle: str | None = Non
             if not results:
                 break
 
+            entries: list[tuple[int, str]] = []
             for tr in results:
                 ex_id = tr.get("exercise")
                 name = _norm_name(tr.get("name") or "")
@@ -125,44 +141,55 @@ async def browse_wger(limit: int = 20, offset: int = 0, muscle: str | None = Non
                     continue
 
                 seen.add(ex_id)
+                entries.append((ex_id, name))
 
-                primary_ids: list[int] = []
-                secondary_ids: list[int] = []
-                try:
-                    e_res = await client.get(f"{WGER_API}/exercise/{ex_id}/")
-                    e_res.raise_for_status()
-                    e = e_res.json()
-                    primary_ids = e.get("muscles") or []
-                    secondary_ids = e.get("muscles_secondary") or []
-                except httpx.HTTPError:
-                    pass
+            if entries:
+                # fetch exercise details concurrently in small batches to reduce latency
+                batch_size = 8
+                for batch_start in range(0, len(entries), batch_size):
+                    batch = entries[batch_start:batch_start + batch_size]
+                    details = await asyncio.gather(
+                        *(_fetch_exercise_detail(client, ex_id) for ex_id, _ in batch),
+                        return_exceptions=True,
+                    )
 
-                muscles = {
-                    "primary": [mm[i] for i in primary_ids if i in mm],
-                    "secondary": [mm[i] for i in secondary_ids if i in mm],
-                }
+                    for (ex_id, name), detail in zip(batch, details):
+                        if isinstance(detail, Exception):
+                            detail = {}
 
-                if muscle_slug:
-                    slug_hits = set(muscles["primary"]) | set(muscles["secondary"])
-                    if muscle_slug not in slug_hits:
-                        continue
+                        primary_ids = detail.get("muscles") or []
+                        secondary_ids = detail.get("muscles_secondary") or []
 
-                cat = category_for(name)
-                matches.append({
-                    "source": "wger",
-                    "source_ref": str(ex_id),
-                    "name": name,
-                    "category": cat,
-                    "equipment": None,
-                    "default_unit": "kg" if cat == "strength" else "min",
-                    "muscles": muscles,
-                })
+                        muscles = {
+                            "primary": [mm[i] for i in primary_ids if i in mm],
+                            "secondary": [mm[i] for i in secondary_ids if i in mm],
+                        }
 
-                if len(matches) >= offset + limit:
-                    break
+                        if muscle_slug:
+                            slug_hits = set(muscles["primary"]) | set(muscles["secondary"])
+                            if muscle_slug not in slug_hits:
+                                continue
+
+                        cat = category_for(name)
+                        matches.append({
+                            "source": "wger",
+                            "source_ref": str(ex_id),
+                            "name": name,
+                            "category": cat,
+                            "equipment": None,
+                            "default_unit": "kg" if cat == "strength" else "min",
+                            "muscles": muscles,
+                        })
+
+                        if len(matches) >= target_count:
+                            break
+
+                    if len(matches) >= target_count:
+                        break
 
             api_offset += page_size
 
         out = matches[offset:offset + limit]
+        has_more = len(matches) > offset + limit
 
-    return out
+    return out, has_more

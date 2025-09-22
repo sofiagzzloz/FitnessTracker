@@ -6,7 +6,15 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import status
 
 from ..db import get_session
-from ..models import Exercise, WorkoutItem, SessionItem, Category
+from ..models import (
+    Exercise,
+    ExerciseMuscle,
+    WorkoutItem,
+    SessionItem,
+    SessionSet,
+    SessionCardio,
+    Category,
+)
 from ..schemas import ExerciseCreate, ExerciseRead, ExerciseUpdate
 
 router = APIRouter(prefix="/api/exercises", tags=["exercises"])
@@ -128,13 +136,47 @@ def delete_exercise(exercise_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     try:
+        # Remove dependent rows first so the exercise can be deleted safely.
+        workout_items = list(
+            session.exec(select(WorkoutItem).where(WorkoutItem.exercise_id == ex.id))
+        )
+        for item in workout_items:
+            session.delete(item)
+
+        session_items = list(
+            session.exec(select(SessionItem).where(SessionItem.exercise_id == ex.id))
+        )
+        for s_item in session_items:
+            sets = list(
+                session.exec(select(SessionSet).where(SessionSet.session_item_id == s_item.id))
+            )
+            for row in sets:
+                session.delete(row)
+
+            cardios = list(
+                session.exec(
+                    select(SessionCardio).where(SessionCardio.session_item_id == s_item.id)
+                )
+            )
+            for row in cardios:
+                session.delete(row)
+
+            session.delete(s_item)
+
+        muscle_links = list(
+            session.exec(
+                select(ExerciseMuscle).where(ExerciseMuscle.exercise_id == ex.id)
+            )
+        )
+        for link in muscle_links:
+            session.delete(link)
+
         session.delete(ex)
         session.commit()
         return None
     except IntegrityError:
         session.rollback()
-        # FK in use somewhere (workout items, session items, etc.)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot delete exercise: it is referenced by workouts/sessions."
+            detail="Cannot delete exercise right now. Please try again.",
         )

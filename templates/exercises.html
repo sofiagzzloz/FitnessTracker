@@ -19,8 +19,13 @@
 
   <main class="wrap">
     <h1>Exercises</h1>
+    <p class="hint" style="margin-top:-8px">Create your own movements or import them from WGER, then manage the full library below.</p>
 
     <section class="card fade-in" style="margin-top:12px">
+      <header style="margin-bottom:12px">
+        <h2 style="margin:0">Manual exercise creation</h2>
+        <p class="hint" style="margin:4px 0 0">Add a custom movement with your preferred name, category, and unit.</p>
+      </header>
       <div class="row">
         <div style="grid-column:span 4" class="form-item"><label>Name</label><input id="ex-name" placeholder="Leg Press"></div>
         <div style="grid-column:span 4" class="form-item"><label>Category</label><input id="ex-category" placeholder="strength"></div>
@@ -29,11 +34,28 @@
       </div>
     </section>
 
-    <div class="card" style="margin-top:12px">
-      <h3>Browse (WGER)</h3>
+    <section class="card" style="margin-top:12px">
+      <header style="margin-bottom:12px">
+        <h2 style="margin:0">WGER exercise library</h2>
+        <p class="hint" style="margin:4px 0 0">Search by name or browse by muscle and import the movements you need.</p>
+      </header>
+
       <div class="row" style="gap:8px; align-items:flex-end">
         <div class="form-item" style="flex:1">
-          <label>Muscle (optional)</label>
+          <label>Exercise name</label>
+          <input id="external-q" placeholder="e.g. Barbell Curl" />
+        </div>
+        <div class="form-item">
+          <button id="external-btn" type="button" class="primary">Search</button>
+        </div>
+      </div>
+      <div id="external-results" style="margin-top:8px"></div>
+
+      <div style="border-top:1px solid #e5e7eb; margin:20px 0"></div>
+
+      <div class="row" style="gap:8px; align-items:flex-end">
+        <div class="form-item" style="flex:1">
+          <label>Browse by muscle</label>
           <select id="browse-muscle">
             <option value="">All</option>
           </select>
@@ -46,11 +68,13 @@
         </div>
       </div>
       <div id="browse-results" style="margin-top:8px"></div>
-    </div>
-    
-      <div id="external-results" style="margin-top:8px"></div>
-    </div>
+    </section>
+
     <section class="card" style="margin-top:12px">
+      <header style="margin-bottom:12px">
+        <h2 style="margin:0">Your exercise library</h2>
+        <p class="hint" style="margin:4px 0 0">Filter and manage the exercises you have created or imported.</p>
+      </header>
       <div class="row">
         <div style="grid-column:span 6" class="form-item"><label>Search</label><input id="ex-q" placeholder="filter…"></div>
         <div style="grid-column:span 6" class="form-item"><label>Category</label><input id="ex-cat-filter" placeholder="strength / cardio"></div>
