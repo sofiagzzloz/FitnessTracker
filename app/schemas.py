@@ -25,7 +25,7 @@ class WorkoutRead(BaseModel):
     exercise_category: Optional[str] = None
 
 class WorkoutUpdate(BaseModel):
-    date: Optional[date] = None 
+    date: Optional[date] = None # type: ignore 
     exercise_id: Optional[int] = None
     sets: Optional[int] = None
     reps: Optional[int] = None

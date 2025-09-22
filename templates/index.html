@@ -79,6 +79,72 @@
         <tbody></tbody>
       </table>
     </section>
+    <section style="margin-top:2rem; padding:1rem; border:1px solid #eee; border-radius:12px;">
+      <h2>Sessions (multi-exercise)</h2>
+    
+      <!-- Create Session -->
+      <div style="display:grid; gap:8px; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items:end;">
+        <div>
+          <label for="s-date">Date</label><br>
+          <input type="date" id="s-date" />
+        </div>
+        <div>
+          <label for="s-title">Title (optional)</label><br>
+          <input type="text" id="s-title" placeholder="Leg Day" />
+        </div>
+        <div style="grid-column: span 2;">
+          <label for="s-notes">Notes (optional)</label><br>
+          <input type="text" id="s-notes" placeholder="RPE 7 ..." />
+        </div>
+        <button id="btn-create-session" style="grid-column: span 4;">Create Session</button>
+      </div>
+    
+      <hr style="margin:1rem 0;">
+    
+      <!-- Select Session -->
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label for="s-select">Current session</label>
+        <select id="s-select"></select>
+        <button id="btn-refresh-sessions">Refresh</button>
+      </div>
+    
+      <hr style="margin:1rem 0;">
+    
+      <!-- Add Item to Session -->
+      <div style="display:grid; gap:8px; grid-template-columns: 2fr 2fr 1fr 1fr;">
+        <div>
+          <label for="si-exercise">Exercise</label><br>
+          <select id="si-exercise"></select>
+        </div>
+        <div>
+          <label for="si-notes">Notes</label><br>
+          <input type="text" id="si-notes" placeholder="warmup / 3x10 ..." />
+        </div>
+        <div>
+          <label for="si-order">Order</label><br>
+          <input type="number" id="si-order" min="0" step="1" />
+        </div>
+        <div style="align-self:end;">
+          <button id="btn-add-item">Add Item</button>
+        </div>
+      </div>
+    
+      <!-- Items Table -->
+      <div style="margin-top:1rem;">
+        <table id="items-table" border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Order</th>
+              <th>Exercise</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="items-tbody"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
   <script src="/static/app.js"></script>
 </body>
