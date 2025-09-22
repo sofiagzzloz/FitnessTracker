@@ -1,38 +1,37 @@
 from typing import List, Optional
 from datetime import date as date_cls, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select
+from sqlmodel import Session as SqlSession, select 
+from ..db import get_session as get_db             
 
-from ..db import get_session
 from ..models import WorkoutSession, WorkoutItem, Exercise
 from ..schemas import SessionCreate, SessionRead, SessionItemCreate, SessionItemRead
-
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 def _now() -> datetime:
     return datetime.utcnow()
 
-def _exercise_or_400(session: Session, ex_id: int) -> Exercise:
-    ex = session.get(Exercise, ex_id)
+def _exercise_or_400(db: SqlSession, ex_id: int) -> Exercise:
+    ex = db.get(Exercise, ex_id)
     if not ex:
         raise HTTPException(status_code=400, detail="Invalid exercise_id")
     return ex
 
 @router.post("", response_model=SessionRead, status_code=201)
-def create_session(payload: SessionCreate, session: Session = Depends(get_session)):
-    s = WorkoutSession(**payload.model_dump())
-    session.add(s)
-    session.commit()
-    session.refresh(s)
+def create_session(payload: SessionCreate, db: SqlSession = Depends(get_db)):
+    s = WorkoutSession(**payload.model_dump(), created_at=_now(), updated_at=_now())
+    db.add(s)
+    db.commit()
+    db.refresh(s)
     return s
 
 @router.get("", response_model=List[SessionRead])
 def list_sessions(
-    session: Session = Depends(get_session),
     on_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD (inclusive)"),
+    db: SqlSession = Depends(get_db),
 ):
     stmt = select(WorkoutSession)
     if on_date:
@@ -42,17 +41,17 @@ def list_sessions(
     if end_date:
         ed = date_cls.fromisoformat(end_date); stmt = stmt.where(WorkoutSession.date <= ed)
     stmt = stmt.order_by(WorkoutSession.date.desc(), WorkoutSession.id.desc())
-    return session.exec(stmt).all()
+    return db.exec(stmt).all()
 
 @router.get("/{session_id}", response_model=SessionRead)
-def get_session(session_id: int, session: Session = Depends(get_session)):
-    s = session.get(WorkoutSession, session_id)
+def read_session(session_id: int, db: SqlSession = Depends(get_db)):  # <-- renamed
+    s = db.get(WorkoutSession, session_id)
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
     return s
 
 @router.post("/{session_id}/items", response_model=SessionItemRead, status_code=201)
-def add_item(session_id: int, payload: SessionItemCreate, db: Session = Depends(get_session)):
+def add_item(session_id: int, payload: SessionItemCreate, db: SqlSession = Depends(get_db)):
     s = db.get(WorkoutSession, session_id)
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -82,7 +81,7 @@ def add_item(session_id: int, payload: SessionItemCreate, db: Session = Depends(
     )
 
 @router.delete("/{session_id}/items/{item_id}", status_code=204)
-def delete_item(session_id: int, item_id: int, db: Session = Depends(get_session)):
+def delete_item(session_id: int, item_id: int, db: SqlSession = Depends(get_db)):
     it = db.get(WorkoutItem, item_id)
     if not it or it.session_id != session_id:
         raise HTTPException(status_code=404, detail="Item not found")

@@ -1,7 +1,10 @@
 const $ = (sel) => document.querySelector(sel);
+
+const BASE = "http://127.0.0.1:8000";
 const API = {
-  exercises: "/exercises",
-  workouts: "/workouts"
+  exercises: `${BASE}/exercises`,
+  workouts:  `${BASE}/workouts`,
+  sessions:  `${BASE}/sessions`,
 };
 
 async function fetchJSON(url, opts={}) {
@@ -134,5 +137,164 @@ async function init() {
   await loadExercises();
   await loadWorkouts();
 }
+
+// ------- helpers -------
+function val(id) { return document.getElementById(id).value; }
+function setOptions(selectEl, arr, toLabel = x => x.label, toValue = x => x.value) {
+  selectEl.innerHTML = "";
+  arr.forEach(opt => {
+    const o = document.createElement("option");
+    o.textContent = toLabel(opt);
+    o.value = toValue(opt);
+    selectEl.appendChild(o);
+  });
+}
+
+// ------- load exercises for dropdown -------
+async function loadExercisesForItems() {
+  const res = await fetch(`${API}/exercises?limit=200`);
+  const data = await res.json();
+  const options = data.map(e => ({ label: `${e.name} (${e.category ?? "-"})`, value: e.id }));
+  setOptions(document.getElementById("si-exercise"), options);
+}
+
+// ------- sessions: list / refresh -------
+async function refreshSessionsDropdown() {
+  const res = await fetch(`${API}/sessions`);
+  const sessions = await res.json();
+  const options = sessions.map(s => ({
+    label: `${s.id} — ${s.date}${s.title ? " — " + s.title : ""}`,
+    value: s.id
+  }));
+  const sel = document.getElementById("s-select");
+  setOptions(sel, options);
+  // if there is at least one session, load its items
+  if (sel.value) {
+    await loadSessionItems(parseInt(sel.value, 10));
+  } else {
+    document.getElementById("items-tbody").innerHTML = "";
+  }
+}
+
+// ------- create session -------
+async function createSession() {
+  const payload = {
+    date: val("s-date"),
+    title: val("s-title") || null,
+    notes: val("s-notes") || null
+  };
+  if (!payload.date) {
+    alert("Please pick a date");
+    return;
+  }
+  const res = await fetch(`${API}/sessions`, {
+    method: "POST",
+    headers: {"content-type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert(`Failed to create session: ${res.status} ${err.detail ?? ""}`);
+    return;
+  }
+  await refreshSessionsDropdown();
+  // preselect the newest one (first option from refresh is latest due to order)
+  alert("Session created");
+}
+
+// ------- list items for selected session -------
+// (MVP: we don’t have a GET /sessions/{id}/items endpoint, so we’ll fetch the
+// session (for existence) and then call a tiny helper endpoint you can add later.
+// For now, we’ll just call /workouts as a placeholder if needed. The real way is
+// to expose /sessions/{id} returning items. For MVP, we’ll keep items client-side
+// after adding. Simpler: call a tiny /sessions/{id} GET and maintain items locally.)
+let _lastItemsCache = []; // simple cache after adding
+
+async function loadSessionItems(sessionId) {
+  // OPTIONAL: once you add a GET items endpoint, replace this with a real fetch
+  // For now, we’ll use the cache built during adds/deletes so the table updates.
+  renderItemsTable(_lastItemsCache.filter(it => it.session_id === sessionId));
+}
+
+function renderItemsTable(items) {
+  const tbody = document.getElementById("items-tbody");
+  tbody.innerHTML = "";
+  items.sort((a,b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  for (const it of items) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${it.id}</td>
+      <td>${it.order_index ?? ""}</td>
+      <td>${it.exercise_name}</td>
+      <td>${it.notes ?? ""}</td>
+      <td><button data-id="${it.id}" data-session="${it.session_id}" class="btn-del-item">Delete</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // wire delete buttons
+  document.querySelectorAll(".btn-del-item").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const itemId = parseInt(btn.getAttribute("data-id"), 10);
+      const sessionId = parseInt(btn.getAttribute("data-session"), 10);
+      const ok = confirm(`Delete item ${itemId}?`);
+      if (!ok) return;
+      const res = await fetch(`${API}/sessions/${sessionId}/items/${itemId}`, { method: "DELETE" });
+      if (res.status !== 204) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to delete: ${res.status} ${err.detail ?? ""}`);
+        return;
+      }
+      // remove from cache + re-render
+      _lastItemsCache = _lastItemsCache.filter(x => x.id !== itemId);
+      await loadSessionItems(sessionId);
+    });
+  });
+}
+
+// ------- add item to selected session -------
+async function addItemToSession() {
+  const sessionIdStr = document.getElementById("s-select").value;
+  if (!sessionIdStr) {
+    alert("Select a session first");
+    return;
+  }
+  const sessionId = parseInt(sessionIdStr, 10);
+  const payload = {
+    exercise_id: parseInt(document.getElementById("si-exercise").value, 10),
+    notes: document.getElementById("si-notes").value || null,
+    order_index: document.getElementById("si-order").value ? parseInt(document.getElementById("si-order").value, 10) : null
+  };
+  const res = await fetch(`${API}/sessions/${sessionId}/items`, {
+    method: "POST",
+    headers: {"content-type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert(`Failed to add item: ${res.status} ${err.detail ?? ""}`);
+    return;
+  }
+  const item = await res.json();
+  // keep a simple client-side cache; later replace with real GET items endpoint
+  _lastItemsCache = _lastItemsCache.filter(x => x.session_id !== sessionId).concat(item);
+  await loadSessionItems(sessionId);
+  // clear notes/order inputs for quick next add
+  document.getElementById("si-notes").value = "";
+  document.getElementById("si-order").value = "";
+}
+
+// ------- wire up on load -------
+window.addEventListener("DOMContentLoaded", async () => {
+  document.getElementById("btn-create-session").addEventListener("click", createSession);
+  document.getElementById("btn-refresh-sessions").addEventListener("click", refreshSessionsDropdown);
+  document.getElementById("btn-add-item").addEventListener("click", addItemToSession);
+  document.getElementById("s-select").addEventListener("change", async (e) => {
+    await loadSessionItems(parseInt(e.target.value, 10));
+  });
+
+  await loadExercisesForItems();
+  await refreshSessionsDropdown();
+});
 
 init();
