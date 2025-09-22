@@ -89,3 +89,24 @@ def delete_item(session_id: int, item_id: int, db: Session = Depends(get_session
     db.delete(it)
     db.commit()
     return
+
+
+@router.get("/{session_id}/items", response_model=List[SessionItemRead])
+def list_items(session_id: int, db: Session = Depends(get_session)):
+    s = db.get(WorkoutSession, session_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    rows = db.exec(select(WorkoutItem).where(WorkoutItem.session_id == session_id)).all()
+    ex_ids = {r.exercise_id for r in rows}
+    ex_map = {e.id: e for e in db.exec(select(Exercise).where(Exercise.id.in_(ex_ids))).all()}
+    return [
+        SessionItemRead(
+            id=r.id,
+            session_id=r.session_id,
+            exercise_id=r.exercise_id,
+            notes=r.notes,
+            order_index=r.order_index,
+            exercise_name=(ex_map.get(r.exercise_id).name if ex_map.get(r.exercise_id) else ""),
+            exercise_category=(ex_map.get(r.exercise_id).category if ex_map.get(r.exercise_id) else None),
+        ) for r in rows
+    ]
