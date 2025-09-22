@@ -107,6 +107,8 @@ function attachExploreHandlers() {
     return;
   }
 
+  out.innerHTML = '<p class="hint">Type a name to search WGER.</p>';
+
   const run = async () => {
     const q = (input.value || '').trim();
     if (!q) { out.innerHTML = '<p class="hint">Type something to search.</p>'; return; }
