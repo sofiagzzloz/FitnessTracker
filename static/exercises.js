@@ -47,11 +47,15 @@ function renderExternalResults(list, q) {
 
   out.innerHTML = '';
 
+  const tokens = (q || '').toLowerCase().split(/\s+/).filter(Boolean);
+
   // client-side relevance guard
-  const filtered = list.filter(it => {
-    const name = (it.name || '').toLowerCase();
-    return tokens.length ? tokens.some(t => name.includes(t)) : true;
-  });
+  const filtered = tokens.length
+    ? list.filter(it => {
+        const name = (it.name || '').toLowerCase();
+        return tokens.some(t => name.includes(t));
+      })
+    : list.slice();
 
   const show = filtered.length ? filtered : [];
   if (!show.length) {
