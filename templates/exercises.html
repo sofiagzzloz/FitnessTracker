@@ -29,13 +29,37 @@
       </div>
     </section>
 
+    <div class="card" style="margin-top:12px">
+      <h3>Explore (WGER)</h3>
+    
+      <div class="row" style="gap:8px; align-items:flex-end">
+        <div class="form-item" style="flex:1">
+          <label>Search external</label>
+          <input id="external-q" placeholder="e.g., bicep, squat, bench" />
+        </div>
+        <div class="form-item">
+          <!-- type=button prevents form submit -->
+          <button id="external-btn" type="button" class="primary">Search</button>
+        </div>
+      </div>
+    
+      <div id="external-results" style="margin-top:8px"></div>
+    </div>
     <section class="card" style="margin-top:12px">
       <div class="row">
         <div style="grid-column:span 6" class="form-item"><label>Search</label><input id="ex-q" placeholder="filter…"></div>
         <div style="grid-column:span 6" class="form-item"><label>Category</label><input id="ex-cat-filter" placeholder="strength / cardio"></div>
       </div>
-      <table id="ex-table" style="margin-top:12px">
-        <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Unit</th></tr></thead>
+      <table id="ex-table">
+        <thead>
+          <tr>
+            <th style="width:60px">ID</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Unit</th>
+            <th class="right" style="width:120px">Actions</th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
     </section>
@@ -48,6 +72,7 @@
     </div>
   </footer>
 
-  <script src="/static/exercises.js" defer></script>
+  <script src="/static/exercises.js?v=dev1"></script>
+  <script>console.log('exercises.js tag inserted');</script>
 </body>
 </html>

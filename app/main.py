@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from .db import init_db
 
 # API routers (ensure these files define APIRouter instances)
-from .routers import exercises, workouts, sessions  # add others as you create them
+from .routers import exercises, workouts, sessions, external # add others as you create them
 
 app = FastAPI(title="Fitness Tracker")
 
@@ -31,6 +31,7 @@ def on_startup() -> None:
 app.include_router(exercises.router)
 app.include_router(workouts.router)
 app.include_router(sessions.router)
+app.include_router(external.router)
 
 # --- Page routes (HTML) ---
 @app.get("/", response_class=HTMLResponse)
