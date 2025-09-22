@@ -5,6 +5,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from typing import Dict, List, Optional
+from sqlmodel import SQLModel, Session, create_engine, select
+from .models import Exercise as DBExercise, WorkoutTemplate as DBTemplate, WorkoutTemplateItem as DBTemplateItem, WorkoutSession as DBSession, WorkoutItem as DBSessionItem
 
 # Simple in-memory storage. In a real app, use a database.
 class MemoryDB:
@@ -166,10 +168,23 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 db = MemoryDB()
 
+# --- Database setup ---
+DB_PATH = BASE_DIR / "fitness.db"
+engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
+SQLModel.metadata.create_all(engine)
+
 # ---- (your routers / API mounts here) ----
 @app.get("/api/exercises")
 def api_list_exercises(q: Optional[str] = None, category: Optional[str] = None):
-    return JSONResponse(db.list_exercises(q, category))
+    with Session(engine) as s:
+        stmt = select(DBExercise)
+        if q:
+            stmt = stmt.where(DBExercise.name.contains(q))
+        if category:
+            stmt = stmt.where(DBExercise.category == category)
+        items = s.exec(stmt).all()
+        data = [{"id": e.id, "name": e.name, "category": e.category or "", "unit": e.default_unit or ""} for e in items]
+        return JSONResponse(data)
 
 @app.post("/api/exercises")
 async def api_create_exercise(request: Request):
@@ -179,12 +194,19 @@ async def api_create_exercise(request: Request):
     unit = (data.get("unit") or "").strip()
     if not name or not category:
         raise HTTPException(status_code=400, detail={"error": "name and category are required"})
-    ex = db.create_exercise(name=name, category=category, unit=unit)
-    return JSONResponse(ex, status_code=201)
+    with Session(engine) as s:
+        ex = DBExercise(name=name, category=category, default_unit=unit or None)
+        s.add(ex)
+        s.commit()
+        s.refresh(ex)
+        return JSONResponse({"id": ex.id, "name": ex.name, "category": ex.category or "", "unit": ex.default_unit or ""}, status_code=201)
 
 @app.get("/api/workouts/templates")
 def api_list_templates():
-    return JSONResponse(db.list_templates())
+    with Session(engine) as s:
+        items = s.exec(select(DBTemplate)).all()
+        data = [{"id": t.id, "name": t.name, "notes": t.notes or ""} for t in items]
+        return JSONResponse(data)
 
 @app.post("/api/workouts/templates")
 async def api_create_template(request: Request):
@@ -193,20 +215,45 @@ async def api_create_template(request: Request):
     notes = (data.get("notes") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail={"error": "name is required"})
-    t = db.create_template(name=name, notes=notes)
-    return JSONResponse(t, status_code=201)
+    with Session(engine) as s:
+        t = DBTemplate(name=name, notes=notes or None)
+        s.add(t)
+        s.commit()
+        s.refresh(t)
+        return JSONResponse({"id": t.id, "name": t.name, "notes": t.notes or ""}, status_code=201)
 
 @app.delete("/api/workouts/templates/{template_id}")
 def api_delete_template(template_id: int):
-    try:
-        db.delete_template(template_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail={"error": "template not found"})
-    return JSONResponse({"ok": True})
+    with Session(engine) as s:
+        t = s.get(DBTemplate, template_id)
+        if not t:
+            raise HTTPException(status_code=404, detail={"error": "template not found"})
+        # delete items first
+        items = s.exec(select(DBTemplateItem).where(DBTemplateItem.template_id == template_id)).all()
+        for it in items:
+            s.delete(it)
+        s.delete(t)
+        s.commit()
+        return JSONResponse({"ok": True})
 
 @app.get("/api/workouts/templates/{template_id}/items")
 def api_list_template_items(template_id: int):
-    return JSONResponse(db.list_template_items(template_id))
+    with Session(engine) as s:
+        items = s.exec(select(DBTemplateItem).where(DBTemplateItem.template_id == template_id).order_by(DBTemplateItem.order_index)).all()
+        # join exercise names
+        result = []
+        for it in items:
+            ex = s.get(DBExercise, it.exercise_id)
+            result.append({
+                "id": it.id,
+                "order": it.order_index or 0,
+                "template_id": it.template_id,
+                "exercise_id": it.exercise_id,
+                "exercise_name": ex.name if ex else str(it.exercise_id),
+                "planned": it.planned or "",
+                "notes": it.notes or "",
+            })
+        return JSONResponse(result)
 
 @app.post("/api/workouts/templates/{template_id}/items")
 async def api_add_template_item(template_id: int, request: Request):
@@ -216,30 +263,69 @@ async def api_add_template_item(template_id: int, request: Request):
     planned = (data.get("planned") or "").strip()
     if not exercise_id:
         raise HTTPException(status_code=400, detail={"error": "exercise_id required"})
-    try:
-        item = db.add_template_item(template_id=template_id, exercise_id=int(exercise_id), notes=notes, planned=planned)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail={"error": str(e)})
-    return JSONResponse(item, status_code=201)
+    with Session(engine) as s:
+        t = s.get(DBTemplate, template_id)
+        ex = s.get(DBExercise, int(exercise_id))
+        if not t or not ex:
+            raise HTTPException(status_code=404, detail={"error": "template or exercise not found"})
+        max_order = s.exec(select(DBTemplateItem.order_index).where(DBTemplateItem.template_id == template_id)).all()
+        next_order = (max([o for o in max_order if o is not None], default=0) + 1) if max_order else 1
+        item = DBTemplateItem(template_id=template_id, exercise_id=int(exercise_id), planned=planned or None, notes=notes or None, order_index=next_order)
+        s.add(item)
+        s.commit()
+        s.refresh(item)
+        return JSONResponse({
+            "id": item.id,
+            "order": item.order_index or 0,
+            "template_id": item.template_id,
+            "exercise_id": item.exercise_id,
+            "exercise_name": ex.name,
+            "planned": item.planned or "",
+            "notes": item.notes or "",
+        }, status_code=201)
 
 @app.put("/api/workouts/templates/{template_id}/items/{item_id}")
 async def api_update_template_item(template_id: int, item_id: int, request: Request):
     data = await request.json()
-    planned = data.get("planned")
-    notes = data.get("notes")
-    try:
-        item = db.update_template_item(template_id=template_id, item_id=item_id, planned=planned, notes=notes)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail={"error": str(e)})
-    return JSONResponse(item)
+    planned = (data.get("planned") or None)
+    notes = (data.get("notes") or None)
+    with Session(engine) as s:
+        item = s.get(DBTemplateItem, item_id)
+        if not item or item.template_id != template_id:
+            raise HTTPException(status_code=404, detail={"error": "item not found"})
+        if planned is not None:
+            item.planned = planned or None
+        if notes is not None:
+            item.notes = notes or None
+        s.add(item)
+        s.commit()
+        s.refresh(item)
+        ex = s.get(DBExercise, item.exercise_id)
+        return JSONResponse({
+            "id": item.id,
+            "order": item.order_index or 0,
+            "template_id": item.template_id,
+            "exercise_id": item.exercise_id,
+            "exercise_name": ex.name if ex else str(item.exercise_id),
+            "planned": item.planned or "",
+            "notes": item.notes or "",
+        })
 
 @app.delete("/api/workouts/templates/{template_id}/items/{item_id}")
 def api_delete_template_item(template_id: int, item_id: int):
-    try:
-        db.delete_template_item(template_id=template_id, item_id=item_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail={"error": str(e)})
-    return JSONResponse({"ok": True})
+    with Session(engine) as s:
+        item = s.get(DBTemplateItem, item_id)
+        if not item or item.template_id != template_id:
+            raise HTTPException(status_code=404, detail={"error": "item not found"})
+        s.delete(item)
+        s.commit()
+        # re-sequence
+        items = s.exec(select(DBTemplateItem).where(DBTemplateItem.template_id == template_id).order_by(DBTemplateItem.order_index)).all()
+        for idx, it in enumerate(items, start=1):
+            it.order_index = idx
+            s.add(it)
+        s.commit()
+        return JSONResponse({"ok": True})
 
 @app.get("/api/sessions")
 def api_list_sessions():
@@ -276,14 +362,15 @@ async def api_add_session_item(session_id: int, request: Request):
 
 @app.get("/api/_exercises_for_select")
 def api_exercises_for_select():
-    # tiny helper endpoint to populate selects
-    items = db.list_exercises(q=None, category=None)
-    return JSONResponse([{ "id": e["id"], "name": e["name"] } for e in items])
+    with Session(engine) as s:
+        items = s.exec(select(DBExercise)).all()
+        return JSONResponse([{ "id": e.id, "name": e.name } for e in items])
 
 @app.get("/api/_templates_for_select")
 def api_templates_for_select():
-    items = db.list_templates()
-    return JSONResponse([{ "id": t["id"], "name": t["name"] } for t in items])
+    with Session(engine) as s:
+        items = s.exec(select(DBTemplate)).all()
+        return JSONResponse([{ "id": t.id, "name": t.name } for t in items])
 
 @app.post("/api/sessions/from_template")
 async def api_create_session_from_template(request: Request):
