@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select
+from sqlmodel import Session, select as DBSession, select
 from sqlalchemy import func
 
 from ..db import get_session
@@ -53,7 +53,7 @@ def create_exercise(payload: ExerciseCreate, session: Session = Depends(get_sess
 # ---------- list ----------
 @router.get("", response_model=List[ExerciseRead])
 def list_exercises(
-    session: Session = Depends(get_session),
+    session: DBSession = Depends(get_session),
     q: Optional[str] = Query(None, description="Substring name match (case-insensitive)"),
     category: Optional[Category] = Query(None, description="Category filter"),
     limit: int = Query(50, ge=1, le=200),
@@ -75,7 +75,7 @@ def list_exercises(
 
 # ---------- get one ----------
 @router.get("/{exercise_id}", response_model=ExerciseRead)
-def get_exercise(exercise_id: int, session: Session = Depends(get_session)):
+def get_exercise(exercise_id: int, session: DBSession = Depends(get_session)):
     ex = session.get(Exercise, exercise_id)
     if not ex:
         raise HTTPException(status_code=404, detail="Exercise not found")

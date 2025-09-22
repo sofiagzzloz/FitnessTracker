@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional
-from datetime import date, datetime
+import datetime as dt
 from enum import Enum
 
 from sqlmodel import SQLModel, Field
@@ -60,8 +60,8 @@ class WorkoutTemplate(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
 
 
 class WorkoutItem(SQLModel, table=True):
@@ -85,8 +85,8 @@ class WorkoutItem(SQLModel, table=True):
     planned_distance_unit: Optional[str] = None  # "km", "mi", etc.
 
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
 
 
 # ---------- Sessions (Logged / Performed) ----------
@@ -95,13 +95,13 @@ class Session(SQLModel, table=True):
     A record of what you actually did. Must be for today or a past date (enforce in API).
     """
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: date = Field(index=True)
+    date: dt.date = Field(index=True)
     title: Optional[str] = None
     notes: Optional[str] = None
     workout_template_id: Optional[int] = Field(default=None, foreign_key="workouttemplate.id")
     status: SessionStatus = Field(default=SessionStatus.completed)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
 
 
 class SessionItem(SQLModel, table=True):
@@ -113,8 +113,8 @@ class SessionItem(SQLModel, table=True):
     order_index: int = Field(default=0, index=True)
     exercise_id: int = Field(foreign_key="exercise.id", index=True)
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
 
 
 class SessionSet(SQLModel, table=True):
@@ -139,4 +139,4 @@ class SessionCardio(SQLModel, table=True):
     distance: Optional[float] = None
     distance_unit: Optional[str] = None
     avg_hr: Optional[int] = None
-    avg_pace: Optional[str] = None             # store "mm:ss/km" as text for now
+    avg_pace: Optional[str] = None             #
