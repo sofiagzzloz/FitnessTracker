@@ -296,4 +296,128 @@ window.addEventListener("DOMContentLoaded", async () => {
   await refreshSessionsDropdown();
 });
 
+async function loadExercisesForAll() {
+  const data = await fetchJSON(`${API.exercises}?limit=200`);
+  const opts = data.map(e => ({ label: `${e.name} (${e.category ?? "-"})`, value: e.id }));
+  // template item exercise select
+  const tSel = $("#ti-exercise"); tSel.innerHTML = "";
+  opts.forEach(o => { const el = document.createElement("option"); el.value = o.value; el.textContent = o.label; tSel.appendChild(el); });
+  // session item exercise select
+  const sSel = $("#si-exercise"); sSel.innerHTML = "";
+  opts.forEach(o => { const el = document.createElement("option"); el.value = o.value; el.textContent = o.label; sSel.appendChild(el); });
+}
+
+async function refreshTemplates() {
+  const list = await fetchJSON(API.templates);
+  const sel = $("#t-select");
+  sel.innerHTML = "";
+  list.forEach(t => {
+    const o = document.createElement("option");
+    o.value = t.id;
+    o.textContent = `${t.id} — ${t.name}`;
+    sel.appendChild(o);
+  });
+  $("#template-items-body").innerHTML = "";
+  if (sel.value) await loadTemplateItems(parseInt(sel.value, 10));
+}
+
+async function createTemplate() {
+  const name = $("#t-name").value.trim();
+  const notes = $("#t-notes").value.trim();
+  if (!name) { alert("Template name required"); return; }
+  await fetchJSON(API.templates, { method: "POST", body: JSON.stringify({ name, notes: notes || null }) });
+  $("#t-name").value = ""; $("#t-notes").value = "";
+  await refreshTemplates();
+}
+
+async function deleteTemplate() {
+  const tid = $("#t-select").value;
+  if (!tid) return;
+  if (!confirm("Delete template and all its items?")) return;
+  await fetchJSON(`${API.templates}/${tid}`, { method: "DELETE" });
+  await refreshTemplates();
+}
+
+async function addTemplateItem() {
+  const tid = $("#t-select").value;
+  if (!tid) { alert("Pick a template first"); return; }
+  const payload = {
+    exercise_id: parseInt($("#ti-exercise").value, 10),
+    sets: $("#ti-sets").value ? parseInt($("#ti-sets").value, 10) : null,
+    reps: $("#ti-reps").value ? parseInt($("#ti-reps").value, 10) : null,
+    weight_kg: $("#ti-weight").value ? parseFloat($("#ti-weight").value) : null,
+    distance_km: $("#ti-distance").value ? parseFloat($("#ti-distance").value) : null,
+    notes: $("#ti-notes").value || null,
+    order_index: $("#ti-order").value ? parseInt($("#ti-order").value, 10) : null,
+  };
+  const item = await fetchJSON(`${API.templates}/${tid}/items`, {
+    method: "POST", body: JSON.stringify(payload)
+  });
+  await loadTemplateItems(parseInt(tid, 10));
+  // clear small inputs
+  ["ti-sets","ti-reps","ti-weight","ti-distance","ti-notes","ti-order"].forEach(id => { $("#"+id).value = ""; });
+}
+
+async function loadTemplateItems(tid) {
+  const rows = await fetchJSON(`${API.templates}/${tid}/items`);
+  const tbody = $("#template-items-body"); tbody.innerHTML = "";
+  rows.sort((a,b)=> (a.order_index ?? 0) - (b.order_index ?? 0));
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.id}</td>
+      <td>${r.order_index ?? ""}</td>
+      <td>${r.exercise_name}</td>
+      <td>${r.sets ?? ""}</td>
+      <td>${r.reps ?? ""}</td>
+      <td>${r.weight_kg ?? ""}</td>
+      <td>${r.distance_km ?? ""}</td>
+      <td>${r.notes ?? ""}</td>
+      <td><button class="btn-del-ti" data-id="${r.id}" data-tid="${tid}">Delete</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll(".btn-del-ti").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-id");
+      const t = btn.getAttribute("data-tid");
+      if (!confirm(`Delete template item #${id}?`)) return;
+      await fetchJSON(`${API.templates}/${t}/items/${id}`, { method: "DELETE" });
+      await loadTemplateItems(parseInt(t, 10));
+    });
+  });
+}
+
+function wireTemplateEvents() {
+  $("#btn-create-template").addEventListener("click", createTemplate);
+  $("#btn-refresh-templates").addEventListener("click", refreshTemplates);
+  $("#btn-delete-template").addEventListener("click", deleteTemplate);
+  $("#btn-add-template-item").addEventListener("click", addTemplateItem);
+  $("#t-select").addEventListener("change", async (e) => {
+    await loadTemplateItems(parseInt(e.target.value, 10));
+  });
+  $("#btn-make-session").addEventListener("click", makeSessionFromTemplate);
+}
+
+function wireSessionEvents() {
+  $("#btn-create-session").addEventListener("click", createSession);
+  $("#btn-refresh-sessions").addEventListener("click", refreshSessions);
+  $("#btn-add-item").addEventListener("click", addItemToSession);
+  $("#s-select").addEventListener("change", async (e) => {
+    await loadSessionItems(parseInt(e.target.value, 10));
+  });
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  wireTemplateEvents();
+  wireSessionEvents();
+  await loadExercisesForAll();
+  // default dates = today
+  const today = new Date().toISOString().slice(0,10);
+  $("#s-date").value = today;
+  $("#ms-date").value = today;
+  await refreshTemplates();
+  await refreshSessions();
+});
+
 init();
