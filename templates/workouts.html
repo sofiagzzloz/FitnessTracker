@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Workouts · Fitness Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="wrap nav">
+      <a href="/" style="font-weight:800">Fitness Tracker</a>
+      <span style="flex:1"></span>
+      <a href="/exercises" class="badge">Exercises</a>
+      <a href="/workouts" class="badge">Workouts</a>
+      <a href="/sessions" class="badge">Sessions</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <h1>Workouts</h1>
+
+    <section class="card fade-in" style="margin-top:12px">
+      <div class="row">
+        <div style="grid-column:span 4"><label>Name</label><input id="t-name"></div>
+        <div style="grid-column:span 6"><label>Notes</label><input id="t-notes"></div>
+        <div style="grid-column:span 2"><button id="btn-create-template" class="primary">Create</button></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <div class="row">
+        <div style="grid-column:span 6"><label>Pick</label><select id="t-select"></select></div>
+        <div style="grid-column:span 2"><button id="btn-refresh-templates">Refresh</button></div>
+        <div style="grid-column:span 2"><button id="btn-delete-template" class="warn">Delete</button></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <h3>Add exercise to workout</h3>
+      <div class="row">
+        <div style="grid-column:span 4"><label>Exercise</label><select id="ti-exercise"></select></div>
+        <div style="grid-column:span 8"><label>Notes</label><input id="ti-notes"></div>
+        <div style="grid-column:span 2"><button id="btn-add-template-item" class="primary">Add</button></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <table id="template-items"><thead><tr><th>ID</th><th>Order</th><th>Exercise</th><th>Planned</th><th>Notes</th></tr></thead><tbody></tbody></table>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
+      <small style="color:#9aa4b2">© Fitness Tracker</small>
+      <small style="color:#9aa4b2">Built for your CS/AI course</small>
+    </div>
+  </footer>
+
+  <script src="/static/workouts.js" defer></script>
+</body>
+</html>

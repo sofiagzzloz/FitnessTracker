@@ -1,302 +1,52 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Fitness Tracker</title>
+  <title>Home · Fitness Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <main class="container">
-    <h1>Fitness Tracker</h1>
+  <header class="site-header">
+    <nav class="wrap nav">
+      <a href="/" style="font-weight:800">Fitness Tracker</a>
+      <span style="flex:1"></span>
+      <a href="/exercises" class="badge">Exercises</a>
+      <a href="/workouts" class="badge">Workouts</a>
+      <a href="/sessions" class="badge">Sessions</a>
+    </nav>
+  </header>
 
-    <!-- Create Workout -->
-    <section class="card">
-      <h2>Log a Workout</h2>
-      <form id="create-form">
-        <div class="row">
-          <label>Date</label>
-          <input type="date" id="date" required />
-        </div>
-        <div class="row">
-          <label>Exercise</label>
-          <select id="exercise" required></select>
-          <button id="add-exercise" type="button">+ Add Exercise</button>
-        </div>
-        <div class="row grid">
-          <label>Sets</label><input type="number" id="sets" min="0" />
-          <label>Reps</label><input type="number" id="reps" min="0" />
-          <label>Weight (kg)</label><input type="number" step="0.1" id="weight_kg" min="0" />
-          <label>Distance (km)</label><input type="number" step="0.01" id="distance_km" min="0" />
-        </div>
-        <div class="row">
-          <label>Notes</label>
-          <input type="text" id="notes" />
-        </div>
-        <button type="submit">Create</button>
-        <span id="create-msg"></span>
-      </form>
-    </section>
+  <main class="wrap" style="padding-top:16px; padding-bottom:40px;">
+    <h1>Welcome</h1>
+    <div class="card fade-in" style="margin-top:12px">
+      <p class="hint">Start by adding a few exercises → <a class="badge" href="/exercises">Go to Exercises</a></p>
+    </div>
 
-    <!-- Quick add exercise modal-ish (simple prompt) -->
-    <section class="card" id="exercise-quick" hidden>
-      <h3>Add Exercise</h3>
-      <div class="row">
-        <label>Name</label><input type="text" id="ex-name" />
+    <div class="row" style="margin-top:12px">
+      <div style="grid-column:span 4">
+        <a href="/exercises" style="text-decoration:none">
+          <div class="card"><h3>Exercises</h3><p class="hint">Manage your exercise library.</p></div>
+        </a>
       </div>
-      <div class="row">
-        <label>Category</label><input type="text" id="ex-category" placeholder="strength/cardio" />
+      <div style="grid-column:span 4">
+        <a href="/workouts" style="text-decoration:none">
+          <div class="card"><h3>Workouts</h3><p class="hint">Build workout plans.</p></div>
+        </a>
       </div>
-      <div class="row">
-        <label>Default unit</label><input type="text" id="ex-unit" placeholder="kg/km/reps" />
+      <div style="grid-column:span 4">
+        <a href="/sessions" style="text-decoration:none">
+          <div class="card"><h3>Sessions</h3><p class="hint">Log performed sessions.</p></div>
+        </a>
       </div>
-      <button id="save-ex">Save</button>
-      <button id="cancel-ex">Cancel</button>
-      <span id="ex-msg"></span>
-    </section>
-
-    <!-- Workouts table -->
-    <section class="card">
-      <h2>Workouts</h2>
-      <div class="filters row">
-        <label for="f-on">On Date</label>
-        <input type="date" id="f-on" />
-        <label for="f-start">Start Date</label>
-        <input type="date" id="f-start" />
-        <label for="f-end">End Date</label>
-        <input type="date" id="f-end" />
-        <label for="f-exercise">Exercise</label>
-        <input type="text" id="f-exercise" placeholder="exercise name" />
-        <button id="apply-filters">Apply</button>
-        <button id="clear-filters">Clear</button>
-      </div>
-      <table id="workouts-table">
-        <thead>
-          <tr>
-            <th>ID</th><th>Date</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Weight</th><th>Distance</th><th>Notes</th><th></th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </section>
-    <section style="margin-top:2rem; padding:1rem; border:1px solid #eee; border-radius:12px;">
-      <h2>Sessions (multi-exercise)</h2>
-    
-      <!-- Create Session -->
-      <div style="display:grid; gap:8px; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items:end;">
-        <div>
-          <label for="s-date">Date</label><br>
-          <input type="date" id="s-date" />
-        </div>
-        <div>
-          <label for="s-title">Title (optional)</label><br>
-          <input type="text" id="s-title" placeholder="Leg Day" />
-        </div>
-        <div style="grid-column: span 2;">
-          <label for="s-notes">Notes (optional)</label><br>
-          <input type="text" id="s-notes" placeholder="RPE 7 ..." />
-        </div>
-        <button id="btn-create-session" style="grid-column: span 4;">Create Session</button>
-      </div>
-    
-      <hr style="margin:1rem 0;">
-    
-      <!-- Select Session -->
-      <div style="display:flex; gap:8px; align-items:center;">
-        <label for="s-select">Current session</label>
-        <select id="s-select"></select>
-        <button id="btn-refresh-sessions">Refresh</button>
-      </div>
-    
-      <hr style="margin:1rem 0;">
-    
-      <!-- Add Item to Session -->
-      <div style="display:grid; gap:8px; grid-template-columns: 2fr 2fr 1fr 1fr;">
-        <div>
-          <label for="si-exercise">Exercise</label><br>
-          <select id="si-exercise"></select>
-        </div>
-        <div>
-          <label for="si-notes">Notes</label><br>
-          <input type="text" id="si-notes" placeholder="warmup / 3x10 ..." />
-        </div>
-        <div>
-          <label for="si-order">Order</label><br>
-          <input type="number" id="si-order" min="0" step="1" />
-        </div>
-        <div style="align-self:end;">
-          <button id="btn-add-item">Add Item</button>
-        </div>
-      </div>
-    
-      <!-- Items Table -->
-      <div style="margin-top:1rem;">
-        <table id="items-table" border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse;">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Order</th>
-              <th>Exercise</th>
-              <th>Notes</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="items-tbody"></tbody>
-        </table>
-      </div>
-    </section>
-    <!-- ================= Templates (Plans) ================ -->
-<section style="margin-top:2rem; padding:1rem; border:1px solid #eee; border-radius:12px;">
-  <h2>Workout Templates (Plans)</h2>
-
-  <!-- Create Template -->
-  <div style="display:grid; gap:8px; grid-template-columns: 2fr 3fr 1fr;">
-    <div>
-      <label for="t-name">Template name</label><br>
-      <input type="text" id="t-name" placeholder="Leg Day A" />
     </div>
-    <div>
-      <label for="t-notes">Notes</label><br>
-      <input type="text" id="t-notes" placeholder="focus on quads" />
-    </div>
-    <div style="align-self:end;">
-      <button id="btn-create-template">Create Template</button>
-    </div>
-  </div>
-
-  <div style="margin:10px 0; display:flex; gap:8px; align-items:center;">
-    <label for="t-select">Current template:</label>
-    <select id="t-select"></select>
-    <button id="btn-refresh-templates">Refresh</button>
-    <button id="btn-delete-template" style="margin-left:auto;">Delete Template</button>
-  </div>
-
-  <!-- Add item to template -->
-  <div style="display:grid; gap:8px; grid-template-columns: 2fr repeat(4, 1fr) 2fr 1fr;">
-    <div>
-      <label>Exercise</label><br>
-      <select id="ti-exercise"></select>
-    </div>
-    <div>
-      <label>Sets</label><br>
-      <input type="number" id="ti-sets" min="0" />
-    </div>
-    <div>
-      <label>Reps</label><br>
-      <input type="number" id="ti-reps" min="0" />
-    </div>
-    <div>
-      <label>Weight (kg)</label><br>
-      <input type="number" id="ti-weight" step="0.1" />
-    </div>
-    <div>
-      <label>Distance (km)</label><br>
-      <input type="number" id="ti-distance" step="0.01" />
-    </div>
-    <div>
-      <label>Notes</label><br>
-      <input type="text" id="ti-notes" placeholder="e.g., 3x10 @ RPE 7" />
-    </div>
-    <div>
-      <label>Order</label><br>
-      <input type="number" id="ti-order" min="0" />
-    </div>
-    <div style="align-self:end;">
-      <button id="btn-add-template-item">Add Item</button>
-    </div>
-  </div>
-
-  <!-- Template items table -->
-  <div style="margin-top:10px;">
-    <table id="template-items" border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse;">
-      <thead>
-        <tr>
-          <th>ID</th><th>Order</th><th>Exercise</th><th>Sets</th><th>Reps</th>
-          <th>Weight</th><th>Distance</th><th>Notes</th><th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="template-items-body"></tbody>
-    </table>
-  </div>
-
-  <!-- Make session from template -->
-  <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
-    <label for="ms-date">Date</label>
-    <input type="date" id="ms-date" />
-    <input type="text" id="ms-title" placeholder="(optional) session title" />
-    <input type="text" id="ms-notes" placeholder="(optional) session notes" />
-    <button id="btn-make-session">Make Session from Template</button>
-  </div>
-</section>
-
-<!-- ================= Sessions (Performed) ================ -->
-<section style="margin-top:2rem; padding:1rem; border:1px solid #eee; border-radius:12px;">
-  <h2>Sessions (Performed)</h2>
-
-  <!-- Create Session -->
-  <div style="display:grid; gap:8px; grid-template-columns: repeat(4, 1fr); align-items:end;">
-    <div>
-      <label for="s-date">Date</label><br>
-      <input type="date" id="s-date" />
-    </div>
-    <div>
-      <label for="s-title">Title</label><br>
-      <input type="text" id="s-title" placeholder="Leg Day" />
-    </div>
-    <div style="grid-column: span 2;">
-      <label for="s-notes">Notes</label><br>
-      <input type="text" id="s-notes" placeholder="RPE 7 ..." />
-    </div>
-    <button id="btn-create-session" style="grid-column: span 4;">Create Session</button>
-  </div>
-
-  <hr style="margin:1rem 0;">
-
-  <!-- Select Session -->
-  <div style="display:flex; gap:8px; align-items:center;">
-    <label for="s-select">Current session</label>
-    <select id="s-select"></select>
-    <button id="btn-refresh-sessions">Refresh</button>
-  </div>
-
-  <hr style="margin:1rem 0;">
-
-  <!-- Add item to Session -->
-  <div style="display:grid; gap:8px; grid-template-columns: 2fr 2fr 1fr 1fr;">
-    <div>
-      <label for="si-exercise">Exercise</label><br>
-      <select id="si-exercise"></select>
-    </div>
-    <div>
-      <label for="si-notes">Notes</label><br>
-      <input type="text" id="si-notes" placeholder="warmup / 3x10 ..." />
-    </div>
-    <div>
-      <label for="si-order">Order</label><br>
-      <input type="number" id="si-order" min="0" step="1" />
-    </div>
-    <div style="align-self:end;">
-      <button id="btn-add-item">Add Item</button>
-    </div>
-  </div>
-
-  <!-- Items Table -->
-  <div style="margin-top:1rem;">
-    <table id="items-table" border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse;">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Order</th>
-          <th>Exercise</th>
-          <th>Notes</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="items-tbody"></tbody>
-    </table>
-  </div>
-</section>
   </main>
-  <script src="/static/app.js"></script>
+
+  <footer class="site-footer">
+    <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
+      <small style="color:#9aa4b2">© Fitness Tracker</small>
+      <small style="color:#9aa4b2">Built for your CS/AI course</small>
+    </div>
+  </footer>
 </body>
 </html>
