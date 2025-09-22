@@ -30,6 +30,16 @@
     </section>
 
     <section class="card" style="margin-top:12px">
+      <h3>Create from workout template</h3>
+      <div class="row">
+        <div style="grid-column:span 6"><label>Template</label><select id="s-template"></select></div>
+        <div style="grid-column:span 3"><label>Date</label><input id="st-date" type="date"></div>
+        <div style="grid-column:span 2"><label>Title (optional)</label><input id="st-title"></div>
+        <div style="grid-column:span 1; align-self:end"><button id="btn-create-from-template" class="primary">Create</button></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
       <div class="row">
         <div style="grid-column:span 6"><label>Pick a session</label><select id="s-select"></select></div>
         <div style="grid-column:span 2"><button id="btn-refresh-sessions">Refresh</button></div>
