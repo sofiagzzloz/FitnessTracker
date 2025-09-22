@@ -2,6 +2,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select as DBSession, select
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from fastapi import status
 
 from ..db import get_session
 from ..models import Exercise, WorkoutItem, SessionItem, Category
@@ -125,21 +127,14 @@ def delete_exercise(exercise_id: int, session: Session = Depends(get_session)):
     if not ex:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
-    # prevent deleting exercises in use (either plans or logged sessions)
-    used_in_template = session.exec(
-        select(WorkoutItem.id).where(WorkoutItem.exercise_id == exercise_id).limit(1)
-    ).first()
-    used_in_session = session.exec(
-        select(SessionItem.id).where(SessionItem.exercise_id == exercise_id).limit(1)
-    ).first()
-
-    if used_in_template or used_in_session:
+    try:
+        session.delete(ex)
+        session.commit()
+        return None
+    except IntegrityError:
+        session.rollback()
+        # FK in use somewhere (workout items, session items, etc.)
         raise HTTPException(
-            status_code=409,
-            detail="Cannot delete exercise: it is referenced by workouts or sessions. "
-                   "Remove it from those first."
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete exercise: it is referenced by workouts/sessions."
         )
-
-    session.delete(ex)
-    session.commit()
-    return None

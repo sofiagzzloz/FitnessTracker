@@ -30,18 +30,23 @@
     </section>
 
     <div class="card" style="margin-top:12px">
-      <h3>Explore (WGER)</h3>
-    
+      <h3>Browse (WGER)</h3>
       <div class="row" style="gap:8px; align-items:flex-end">
         <div class="form-item" style="flex:1">
-          <label>Search external</label>
-          <input id="external-q" placeholder="e.g., bicep, squat, bench" />
+          <label>Muscle (optional)</label>
+          <select id="browse-muscle">
+            <option value="">All</option>
+          </select>
         </div>
         <div class="form-item">
-          <!-- type=button prevents form submit -->
-          <button id="external-btn" type="button" class="primary">Search</button>
+          <button id="browse-btn" type="button" class="primary">Browse</button>
+        </div>
+        <div class="form-item" style="margin-left:auto">
+          <button id="browse-more" type="button">Load more</button>
         </div>
       </div>
+      <div id="browse-results" style="margin-top:8px"></div>
+    </div>
     
       <div id="external-results" style="margin-top:8px"></div>
     </div>

@@ -4,10 +4,40 @@ import httpx
 
 from ..db import get_session
 from ..models import Exercise, Muscle, ExerciseMuscle, Category
-from ..services.adapters.wger import search_wger
+from ..services.adapters.wger import search_wger, browse_wger
 from ..schemas import ExerciseRead
+from fastapi import APIRouter, Depends, Query
 
 router = APIRouter(prefix="/api/external", tags=["external"])
+
+MUSCLES = [
+    {"slug": "biceps", "label": "Biceps"},
+    {"slug": "triceps", "label": "Triceps"},
+    {"slug": "chest", "label": "Chest"},
+    {"slug": "lats", "label": "Lats / Back"},
+    {"slug": "quads", "label": "Quads"},
+    {"slug": "hams", "label": "Hamstrings"},
+    {"slug": "glutes", "label": "Glutes"},
+    {"slug": "calves", "label": "Calves"},
+    {"slug": "delts", "label": "Shoulders (Delts)"},
+    {"slug": "abs", "label": "Abs / Core"},
+]
+
+@router.get("/muscles")
+def list_muscles():
+    return MUSCLES
+
+
+@router.get("/exercises/browse")
+async def external_browse(
+    muscle: str | None = Query(None, description="Filter by muscle term in name (optional)"),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+):
+    items = await browse_wger(limit=limit, offset=offset, muscle=muscle)
+    # also return next_offset to help the UI paginate
+    next_offset = offset + limit
+    return {"items": items, "limit": limit, "offset": offset, "next_offset": next_offset}
 
 @router.get("/exercises")
 async def external_search(
