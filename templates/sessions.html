@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sessions · Fitness Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="wrap nav">
+      <a href="/" style="font-weight:800">Fitness Tracker</a>
+      <span style="flex:1"></span>
+      <a href="/exercises" class="badge">Exercises</a>
+      <a href="/workouts" class="badge">Workouts</a>
+      <a href="/sessions" class="badge">Sessions</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <h1>Sessions</h1>
+
+    <section class="card fade-in" style="margin-top:12px">
+      <div class="row">
+        <div style="grid-column:span 3"><label>Date</label><input id="s-date" type="date"></div>
+        <div style="grid-column:span 5"><label>Title</label><input id="s-title"></div>
+        <div style="grid-column:span 3"><label>Notes</label><input id="s-notes"></div>
+        <div style="grid-column:span 1"><button id="btn-create-session" class="primary">Create</button></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <div class="row">
+        <div style="grid-column:span 6"><label>Pick a session</label><select id="s-select"></select></div>
+        <div style="grid-column:span 2"><button id="btn-refresh-sessions">Refresh</button></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <h3>Add exercise to session</h3>
+      <div class="row">
+        <div style="grid-column:span 6"><label>Exercise</label><select id="si-exercise"></select></div>
+        <div style="grid-column:span 5"><label>Notes</label><input id="si-notes"></div>
+        <div style="grid-column:span 1"><label>Order</label><input id="si-order" type="number"></div>
+        <div style="grid-column:span 12; text-align:right; margin-top:8px"><button id="btn-add-item" class="primary">Add</button></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <table id="items-table"><thead><tr><th>ID</th><th>Order</th><th>Exercise</th><th>Notes</th></tr></thead><tbody></tbody></table>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
+      <small style="color:#9aa4b2">© Fitness Tracker</small>
+      <small style="color:#9aa4b2">Built for your CS/AI course</small>
+    </div>
+  </footer>
+
+  <script src="/static/sessions.js" defer></script>
+</body>
+</html>
