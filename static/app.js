@@ -3,11 +3,12 @@ const $ = (sel) => document.querySelector(sel);
 const BASE = "http://127.0.0.1:8000";
 const API = {
   exercises: `${BASE}/exercises`,
-  workouts:  `${BASE}/workouts`,
+  workouts:  `${BASE}/workouts`,   // legacy v1; might delete later 
   sessions:  `${BASE}/sessions`,
+  templates: `${BASE}/templates`,
 };
 
-async function fetchJSON(url, opts={}) {
+async function fetchJSON(url, opts = {}) {
   const r = await fetch(url, { headers: { "Content-Type": "application/json" }, ...opts });
   if (!r.ok) throw new Error(await r.text());
   return r.status === 204 ? null : r.json();
@@ -211,8 +212,6 @@ async function createSession() {
 let _lastItemsCache = []; // simple cache after adding
 
 async function loadSessionItems(sessionId) {
-  // OPTIONAL: once you add a GET items endpoint, replace this with a real fetch
-  // For now, we’ll use the cache built during adds/deletes so the table updates.
   renderItemsTable(_lastItemsCache.filter(it => it.session_id === sessionId));
 }
 
