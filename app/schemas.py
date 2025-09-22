@@ -83,4 +83,35 @@ class SessionItemRead(BaseModel):
     exercise_name: str
     exercise_category: Optional[str] = None
 
-    
+class TemplateCreate(BaseModel):
+    name: str
+    notes: Optional[str] = None
+
+class TemplateRead(BaseModel):
+    id: int
+    name: str
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+class TemplateItemCreate(BaseModel):
+    exercise_id: int
+    sets: Optional[int] = None
+    reps: Optional[int] = None
+    weight_kg: Optional[float] = None
+    distance_km: Optional[float] = None
+    notes: Optional[str] = None
+    order_index: Optional[int] = None
+
+class TemplateItemRead(BaseModel):
+    id: int
+    template_id: int
+    exercise_id: int
+    sets: Optional[int] = None
+    reps: Optional[int] = None
+    weight_kg: Optional[float] = None
+    distance_km: Optional[float] = None
+    notes: Optional[str] = None
+    order_index: Optional[int] = None
+    exercise_name: str
+    exercise_category: Optional[str] = None
