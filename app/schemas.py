@@ -1,117 +1,138 @@
 from typing import Optional
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from enum import Enum
 
-class WorkoutCreate(BaseModel):
-    date: date
-    exercise_id: int
-    sets: Optional[int] = None
-    reps: Optional[int] = None
-    weight_kg: Optional[float] = None
-    distance_km: Optional[float] = None
-    notes: Optional[str] = None
 
-class WorkoutRead(BaseModel):
-    id: int
-    date: date
-    exercise_id: int
-    sets: Optional[int] = None
-    reps: Optional[int] = None
-    weight_kg: Optional[float] = None
-    distance_km: Optional[float] = None
-    notes: Optional[str] = None
+# ---------- Enums ----------
+class Category(str, Enum):
+    strength = "strength"
+    cardio = "cardio"
+    mobility = "mobility"
 
-    exercise_name: str
-    exercise_category: Optional[str] = None
 
-class WorkoutUpdate(BaseModel):
-    date: Optional[date] = None # type: ignore 
-    exercise_id: Optional[int] = None
-    sets: Optional[int] = None
-    reps: Optional[int] = None
-    weight_kg: Optional[float] = None
-    distance_km: Optional[float] = None
-    notes: Optional[str] = None
+class MuscleRole(str, Enum):
+    primary = "primary"
+    secondary = "secondary"
 
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {"sets": 3, "reps": 10},
-                {"weight_kg": 10},
-                {"exercise_id": 5, "notes": "bigger"}
-            ]
-        }
-    }
 
+class SessionStatus(str, Enum):
+    draft = "draft"
+    completed = "completed"
+
+
+# ---------- Exercises ----------
 class ExerciseCreate(BaseModel):
-    name: str = Field(min_length=1)
-    category: Optional[str] = None
+    name: str
+    category: Category
     default_unit: Optional[str] = None
+    equipment: Optional[str] = None
+
 
 class ExerciseRead(ExerciseCreate):
     id: int
+    source: str
+    source_ref: Optional[str] = None
+
 
 class ExerciseUpdate(BaseModel):
     name: Optional[str] = None
-    category: Optional[str] = None
+    category: Optional[Category] = None
     default_unit: Optional[str] = None
+    equipment: Optional[str] = None
 
+
+# ---------- Muscles ----------
+class MuscleRead(BaseModel):
+    id: int
+    name: str
+    slug: str
+
+
+# ---------- Workout Templates ----------
+class WorkoutTemplateCreate(BaseModel):
+    name: str
+    notes: Optional[str] = None
+
+
+class WorkoutTemplateRead(WorkoutTemplateCreate):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkoutItemCreate(BaseModel):
+    exercise_id: int
+    order_index: Optional[int] = 0
+    # planned (strength)
+    planned_sets: Optional[int] = None
+    planned_reps: Optional[int] = None
+    planned_weight: Optional[float] = None
+    planned_rpe: Optional[float] = None
+    # planned (cardio)
+    planned_minutes: Optional[int] = None
+    planned_distance: Optional[float] = None
+    planned_distance_unit: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class WorkoutItemRead(WorkoutItemCreate):
+    id: int
+    workout_template_id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------- Sessions ----------
 class SessionCreate(BaseModel):
     date: date
     title: Optional[str] = None
     notes: Optional[str] = None
+    workout_template_id: Optional[int] = None
 
-class SessionRead(BaseModel):
+
+class SessionRead(SessionCreate):
     id: int
-    date: date
-    title: Optional[str] = None
-    notes: Optional[str] = None
+    status: SessionStatus
     created_at: datetime
     updated_at: datetime
+
 
 class SessionItemCreate(BaseModel):
     exercise_id: int
+    order_index: Optional[int] = 0
     notes: Optional[str] = None
-    order_index: Optional[int] = None
 
-class SessionItemRead(BaseModel):
+
+class SessionItemRead(SessionItemCreate):
     id: int
     session_id: int
-    exercise_id: int
-    notes: Optional[str] = None
-    order_index: Optional[int] = None
-    exercise_name: str
-    exercise_category: Optional[str] = None
-
-class TemplateCreate(BaseModel):
-    name: str
-    notes: Optional[str] = None
-
-class TemplateRead(BaseModel):
-    id: int
-    name: str
-    notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
-class TemplateItemCreate(BaseModel):
-    exercise_id: int
-    sets: Optional[int] = None
-    reps: Optional[int] = None
-    weight_kg: Optional[float] = None
-    distance_km: Optional[float] = None
-    notes: Optional[str] = None
-    order_index: Optional[int] = None
 
-class TemplateItemRead(BaseModel):
-    id: int
-    template_id: int
-    exercise_id: int
-    sets: Optional[int] = None
+# ---------- Strength Sets ----------
+class SessionSetCreate(BaseModel):
+    set_number: int
     reps: Optional[int] = None
-    weight_kg: Optional[float] = None
-    distance_km: Optional[float] = None
-    notes: Optional[str] = None
-    order_index: Optional[int] = None
-    exercise_name: str
-    exercise_category: Optional[str] = None
+    weight: Optional[float] = None
+    rpe: Optional[float] = None
+
+
+class SessionSetRead(SessionSetCreate):
+    id: int
+    session_item_id: int
+
+
+# ---------- Cardio Metrics ----------
+class SessionCardioUpdate(BaseModel):
+    minutes: Optional[int] = None
+    distance: Optional[float] = None
+    distance_unit: Optional[str] = None
+    avg_hr: Optional[int] = None
+    avg_pace: Optional[str] = None
+
+
+class SessionCardioRead(SessionCardioUpdate):
+    id: int
+    session_item_id: int
