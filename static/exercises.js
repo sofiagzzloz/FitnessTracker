@@ -5,6 +5,8 @@ function debounce(fn, ms=200){
   let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
 }
 
+let _browseState = { muscle: '', limit: 12, offset: 0, loading: false };
+
 // --- backend calls ---
 async function searchExternal(q) {
   const url = `/api/external/exercises?q=${encodeURIComponent(q)}&limit=10`;
@@ -184,4 +186,122 @@ document.addEventListener('click', async (e) => {
     console.error(err);
     alert(err.message || 'Could not delete (it may be used by a workout/session).');
   }
+});
+
+async function fetchMuscles() {
+  try {
+    const res = await fetch('/api/external/muscles');
+    const list = await res.json();
+    const sel = el('browse-muscle');
+    if (sel && Array.isArray(list)) {
+      list.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.slug;
+        opt.textContent = m.label;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (_) { /* ignore */ }
+}
+
+async function browseExternal(reset=false) {
+  if (_browseState.loading) return;
+  _browseState.loading = true;
+  const cont = el('browse-results');
+  cont.innerHTML = cont.innerHTML || '<p class="hint">Loading…</p>';
+
+  if (reset) _browseState.offset = 0;
+
+  const params = new URLSearchParams();
+  if (_browseState.muscle) params.set('muscle', _browseState.muscle);
+  params.set('limit', String(_browseState.limit));
+  params.set('offset', String(_browseState.offset));
+
+  try {
+    const res = await fetch(`/api/external/exercises/browse?${params.toString()}`);
+    if (!res.ok) throw new Error(`Browse failed ${res.status}`);
+    const data = await res.json();
+    const items = data.items || [];
+    if (reset) cont.innerHTML = '';
+
+    renderBrowseResults(items, !!reset);
+    _browseState.offset = data.next_offset ?? (_browseState.offset + _browseState.limit);
+  } catch (err) {
+    console.error(err);
+    cont.innerHTML = `<p class="hint">Error: ${err.message || err}</p>`;
+  } finally {
+    _browseState.loading = false;
+  }
+}
+
+function renderBrowseResults(items, firstPage) {
+  const cont = el('browse-results');
+  if (!cont) return;
+  if (firstPage && !items.length) {
+    cont.innerHTML = '<p class="hint">No items found.</p>';
+    return;
+  }
+  items.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.marginTop = '8px';
+
+    const prim = (item.muscles?.primary || []).join(', ');
+    const sec  = (item.muscles?.secondary || []).join(', ');
+    const muscles = prim || sec ? ` • muscles: ${prim}${sec ? ` (sec: ${sec})` : ''}` : '';
+
+    const uid = `bimp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <div style="font-weight:700">${item.name}</div>
+          <div class="hint">${item.category || ''}${muscles}</div>
+        </div>
+        <button type="button" class="primary" id="${uid}">Import</button>
+      </div>`;
+    cont.appendChild(card);
+
+    card.querySelector('#' + uid).addEventListener('click', async () => {
+      try {
+        const saved = await importExternal(item);
+        alert(`Imported: ${saved.name}`);
+        await fetchLocalExercises();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Import failed');
+      }
+    });
+  });
+}
+
+// wire browse UI
+function attachBrowseHandlers() {
+  const sel = el('browse-muscle');
+  const btn = el('browse-btn');
+  const more = el('browse-more');
+  if (!sel || !btn || !more) return;
+
+  sel.addEventListener('change', () => {
+    _browseState.muscle = sel.value || '';
+  });
+
+  btn.addEventListener('click', () => {
+    browseExternal(true); // reset paging
+  });
+
+  more.addEventListener('click', () => {
+    browseExternal(false); // next page
+  });
+
+  // init on load
+  _browseState.muscle = sel.value || '';
+  browseExternal(true);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  attachExploreHandlers();
+  wireLocalFilters();
+  fetchLocalExercises();
+  fetchMuscles();
+  attachBrowseHandlers();
 });
