@@ -4,27 +4,32 @@ from sqlmodel import Session, select
 from sqlalchemy import func
 
 from ..db import get_session
-from ..models import Exercise, Workout
+from ..models import Exercise, WorkoutItem, SessionItem, Category
 from ..schemas import ExerciseCreate, ExerciseRead, ExerciseUpdate
 
-router = APIRouter(prefix="/exercises", tags=["exercises"])
+router = APIRouter(prefix="/api/exercises", tags=["exercises"])
 
-def _norm_name(name: str) -> str:
-    # normalize for comparisons and storage 
-    return " ".join(name.strip().split())
+
+# ---------- helpers ----------
+def _norm(s: Optional[str]) -> Optional[str]:
+    if s is None:
+        return None
+    return " ".join(s.strip().split()) or None
+
 
 def _case_insensitive_equal(a: str, b: str) -> bool:
     return a.casefold() == b.casefold()
 
+
+# ---------- create ----------
 @router.post("", response_model=ExerciseRead, status_code=201)
 def create_exercise(payload: ExerciseCreate, session: Session = Depends(get_session)):
-    # validate basic name
     if not payload.name or not payload.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
 
-    norm_name = _norm_name(payload.name)
+    norm_name = _norm(payload.name)
 
-    # case-insensitive uniqueness check
+    # case-insensitive uniqueness
     dup = session.exec(
         select(Exercise).where(func.lower(Exercise.name) == norm_name.lower())
     ).first()
@@ -33,41 +38,42 @@ def create_exercise(payload: ExerciseCreate, session: Session = Depends(get_sess
 
     ex = Exercise(
         name=norm_name,
-        category=payload.category.strip() if payload.category else None,
-        default_unit=payload.default_unit.strip() if payload.default_unit else None,
+        category=payload.category,  # pydantic enum validated
+        default_unit=_norm(payload.default_unit),
+        equipment=_norm(payload.equipment),
+        source="local",
+        source_ref=None,
     )
     session.add(ex)
     session.commit()
     session.refresh(ex)
     return ex
 
+
+# ---------- list ----------
 @router.get("", response_model=List[ExerciseRead])
 def list_exercises(
     session: Session = Depends(get_session),
-    q: Optional[str] = Query(None, description="Substring match on name (case-insensitive)"),
-    category: Optional[str] = Query(None, description="Category filter (case-insensitive partial)"),
+    q: Optional[str] = Query(None, description="Substring name match (case-insensitive)"),
+    category: Optional[Category] = Query(None, description="Category filter"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    sort: str = Query("name", pattern="^(name|id)$"), 
+    sort: str = Query("name", pattern="^(name|id)$"),
 ):
     stmt = select(Exercise)
 
     if q:
         stmt = stmt.where(func.lower(Exercise.name).like(f"%{q.lower()}%"))
-    if category:
-        stmt = stmt.where(func.lower(Exercise.category).like(f"%{category.lower()}%"))
+    if category is not None:
+        stmt = stmt.where(Exercise.category == category)
 
-    # order
-    if sort == "name":
-        stmt = stmt.order_by(Exercise.name.asc())
-    else:
-        stmt = stmt.order_by(Exercise.id.asc())
-
-    # pagination
+    stmt = stmt.order_by(Exercise.name.asc() if sort == "name" else Exercise.id.asc())
     stmt = stmt.limit(limit).offset(offset)
 
     return session.exec(stmt).all()
 
+
+# ---------- get one ----------
 @router.get("/{exercise_id}", response_model=ExerciseRead)
 def get_exercise(exercise_id: int, session: Session = Depends(get_session)):
     ex = session.get(Exercise, exercise_id)
@@ -75,6 +81,8 @@ def get_exercise(exercise_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Exercise not found")
     return ex
 
+
+# ---------- update ----------
 @router.put("/{exercise_id}", response_model=ExerciseRead)
 def update_exercise(exercise_id: int, payload: ExerciseUpdate, session: Session = Depends(get_session)):
     ex = session.get(Exercise, exercise_id)
@@ -83,9 +91,9 @@ def update_exercise(exercise_id: int, payload: ExerciseUpdate, session: Session 
 
     data = payload.model_dump(exclude_unset=True)
 
-    # name: normalize + case-insensitive uniqueness
+    # name: normalize + uniqueness
     if "name" in data and data["name"] is not None:
-        new_name = _norm_name(data["name"])
+        new_name = _norm(data["name"])
         if not new_name:
             raise HTTPException(status_code=400, detail="Name cannot be empty")
         if not _case_insensitive_equal(new_name, ex.name):
@@ -97,29 +105,39 @@ def update_exercise(exercise_id: int, payload: ExerciseUpdate, session: Session 
         ex.name = new_name
 
     if "category" in data:
-        ex.category = data["category"].strip() if data["category"] else None
+        # pydantic already validated enum if provided
+        ex.category = data["category"] or ex.category
     if "default_unit" in data:
-        ex.default_unit = data["default_unit"].strip() if data["default_unit"] else None
+        ex.default_unit = _norm(data["default_unit"])
+    if "equipment" in data:
+        ex.equipment = _norm(data["equipment"])
 
     session.add(ex)
     session.commit()
     session.refresh(ex)
     return ex
 
+
+# ---------- delete ----------
 @router.delete("/{exercise_id}", status_code=204)
 def delete_exercise(exercise_id: int, session: Session = Depends(get_session)):
     ex = session.get(Exercise, exercise_id)
     if not ex:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
-    # prevent deleting exercises in use 
-    in_use = session.exec(
-        select(Workout.id).where(Workout.exercise_id == exercise_id).limit(1)
+    # prevent deleting exercises in use (either plans or logged sessions)
+    used_in_template = session.exec(
+        select(WorkoutItem.id).where(WorkoutItem.exercise_id == exercise_id).limit(1)
     ).first()
-    if in_use:
+    used_in_session = session.exec(
+        select(SessionItem.id).where(SessionItem.exercise_id == exercise_id).limit(1)
+    ).first()
+
+    if used_in_template or used_in_session:
         raise HTTPException(
             status_code=409,
-            detail="Cannot delete exercise: there are workouts using it. Reassign or delete those workouts first."
+            detail="Cannot delete exercise: it is referenced by workouts or sessions. "
+                   "Remove it from those first."
         )
 
     session.delete(ex)
