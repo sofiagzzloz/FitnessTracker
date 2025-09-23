@@ -61,6 +61,7 @@
       </div>
       <div id="external-results" style="margin-top:8px"></div>
     </div>
+
     <section class="card" style="margin-top:12px">
       <div class="row">
         <div style="grid-column:span 6" class="form-item"><label>Search</label><input id="ex-q" placeholder="filter…"></div>
@@ -88,7 +89,39 @@
     </div>
   </footer>
 
-  <script src="/static/exercises.js?v=dev1"></script>
+  <script src="/static/exercises.js?v=dev3"></script>
   <script>console.log('exercises.js tag inserted');</script>
+
+  <!-- Delete-usage modal -->
+  <div id="delete-usage-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Exercise is in use</h3>
+      <p id="usage-text"></p>
+      <div id="usage-links"></div>
+      <button id="usage-close" type="button">Close</button>
+    </div>
+  </div>
+
+  <style>
+    .modal.hidden { display:none; }
+    .modal {
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.35);
+      display:flex; align-items:center; justify-content:center;
+      z-index:1000;
+    }
+    .modal-content {
+      background:#fff;
+      padding:1rem 1.25rem;
+      border-radius:.5rem;
+      max-width:520px;
+      width:90%;
+    }
+    #usage-links a {
+      display:inline-block;
+      margin-right:.5rem;
+      margin-top:.5rem;
+    }
+  </style>
 </body>
 </html>
