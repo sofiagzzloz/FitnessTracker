@@ -29,39 +29,59 @@
       </div>
     </section>
 
-    <div class="card" style="margin-top:12px">
-      <h3>Browse (WGER)</h3>
-      <div class="row" style="gap:8px; align-items:flex-end">
-        <div class="form-item" style="flex:1">
-          <label>Muscle (optional)</label>
-          <select id="browse-muscle">
-            <option value="">All</option>
-          </select>
-        </div>
-        <div class="form-item">
-          <button id="browse-btn" type="button" class="primary">Browse</button>
-        </div>
-        <div class="form-item" style="margin-left:auto">
-          <button id="browse-more" type="button">Load more</button>
-        </div>
-      </div>
-      <div id="browse-results" style="margin-top:8px"></div>
-    </div>
+ <!-- External catalog: Search or Browse -->
+<div class="card" style="margin-top:12px">
+  <h3>Find exercises (WGER)</h3>
 
-    <div class="card" style="margin-top:12px">
-      <h3>Search (WGER)</h3>
-      <div class="row" style="gap:8px; align-items:flex-end">
-        <div class="form-item" style="flex:1">
-          <label>Exercise name</label>
-          <input id="external-q" placeholder="e.g. Barbell Curl" />
-        </div>
-        <div class="form-item">
-          <button id="external-btn" type="button" class="primary">Search</button>
-        </div>
-      </div>
-      <div id="external-results" style="margin-top:8px"></div>
-    </div>
+  <div class="tabs">
+    <button class="tab active" id="tab-search">Search by name</button>
+    <button class="tab" id="tab-browse">Browse by muscle</button>
+  </div>
 
+  <!-- Search pane -->
+  <div id="pane-search" class="pane active">
+    <div class="row" style="gap:8px; align-items:flex-end">
+      <div class="form-item" style="flex:1">
+        <label>Exercise name</label>
+        <input id="external-q" placeholder="e.g. barbell curl" />
+        <small class="hint">Type at least 2 letters, then press Enter or click Search.</small>
+      </div>
+      <div class="form-item">
+        <button id="external-btn" type="button" class="primary">Search</button>
+      </div>
+    </div>
+    <div id="external-results" style="margin-top:8px"></div>
+  </div>
+
+  <!-- Browse pane -->
+  <div id="pane-browse" class="pane">
+    <div class="row" style="gap:8px; align-items:flex-end">
+      <div class="form-item" style="flex:1">
+        <label>Muscle</label>
+        <select id="browse-muscle">
+          <option value="">Choose a muscle…</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <button id="browse-btn" type="button">Browse</button>
+      </div>
+      <div class="form-item" style="margin-left:auto">
+        <button id="browse-more" type="button" disabled>Load more</button>
+      </div>
+    </div>
+    <div id="browse-results" style="margin-top:8px"></div>
+  </div>
+</div>
+
+    <style>
+      .tabs { display:flex; gap:6px; margin:6px 0 10px; }
+      .tab { padding:6px 10px; border-radius:8px; border:1px solid var(--line,#334); background:#111; cursor:pointer; }
+      .tab.active { background:#1c2430; border-color:#2c9fed; }
+      .pane { display:none; }
+      .pane.active { display:block; }
+      .spinner { display:inline-block; width:16px; height:16px; border:2px solid #999; border-top-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:6px; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
     <section class="card" style="margin-top:12px">
       <div class="row">
         <div style="grid-column:span 6" class="form-item"><label>Search</label><input id="ex-q" placeholder="filter…"></div>
@@ -89,7 +109,7 @@
     </div>
   </footer>
 
-  <script src="/static/exercises.js?v=dev3"></script>
+  <script src="/static/exercises.js?v=dev6"></script>
   <script>console.log('exercises.js tag inserted');</script>
 
   <!-- Delete-usage modal -->

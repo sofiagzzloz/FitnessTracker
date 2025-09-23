@@ -13,6 +13,99 @@ function debounce(fn, ms = 200) {
 
 let _browseState = { muscle: '', limit: 12, offset: 0, loading: false };
 
+// normalize accents + lowercase
+function norm(s) {
+  return (s || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+// muscle guesser (used only if you keep the fallback in the search pane)
+function guessMuscleFromQuery(q) {
+  const t = norm(q);
+  const map = {
+    bicep: "biceps", biceps: "biceps",
+    tricep: "triceps", triceps: "triceps",
+    quad: "quads", quadriceps: "quads", quads: "quads",
+    hamstring: "hams", hamstrings: "hams", hams: "hams",
+    glute: "glutes", glutes: "glutes",
+    calf: "calves", calves: "calves",
+    chest: "chest", pec: "chest", pectoral: "chest", pectorals: "chest",
+    back: "lats", lat: "lats", lats: "lats",
+    delt: "delts", delts: "delts", shoulder: "delts", shoulders: "delts",
+    abs: "abs", core: "abs",
+  };
+  for (const key of Object.keys(map)) if (t.includes(key)) return map[key];
+  return null;
+}
+
+// simple caches and aborters
+const _cache = { search: new Map(), browse: new Map() };
+const _aborters = { search: null, browse: null };
+
+function setLoading(el, msg="Loading…") {
+  el.innerHTML = `<span class="spinner"></span><span>${msg}</span>`;
+}
+
+
+async function createExercise(payload) {
+  const res = await fetch('/api/exercises', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(txt || `Create failed (${res.status})`);
+  }
+  return res.json();
+}
+
+function attachAddExerciseHandler() {
+  const btn = el('btn-add-exercise');
+  const name = el('ex-name');
+  const cat = el('ex-category');
+  const unit = el('ex-unit');
+
+  if (!btn || !name) return;
+
+  btn.addEventListener('click', async () => {
+    const n = (name.value || '').trim();
+    const c = (cat?.value || 'strength').trim().toLowerCase();
+    const u = (unit?.value || '').trim() || null;
+
+    if (n.length < 2) {
+      alert('Please enter a valid exercise name.');
+      name.focus();
+      return;
+    }
+
+    // backend expects Category enum: strength | cardio | mobility
+    const validCats = new Set(['strength', 'cardio', 'mobility']);
+    const category = validCats.has(c) ? c : 'strength';
+
+    try {
+      await createExercise({
+        name: n,
+        category,
+        default_unit: u,
+        equipment: null
+      });
+      // clear inputs and refresh table
+      name.value = '';
+      if (cat) cat.value = category;
+      if (unit) unit.value = '';
+      await fetchLocalExercises();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not add exercise.');
+    }
+  });
+}
+
+
 // --- usage modal ---
 function showUsageModal(usage) {
   const modal = el('delete-usage-modal');
@@ -49,13 +142,22 @@ document.addEventListener('click', (ev) => {
 
 // --- backend calls ---
 async function searchExternal(q) {
-  const url = `/api/external/exercises?q=${encodeURIComponent(q)}&limit=10`;
-  const res = await fetch(url);
+  const key = norm(q);
+  if (_cache.search.has(key)) return _cache.search.get(key);
+
+  // cancel previous search
+  if (_aborters.search) _aborters.search.abort();
+  _aborters.search = new AbortController();
+
+  const url = `/api/external/exercises?q=${encodeURIComponent(q)}&limit=20`;
+  const res = await fetch(url, { signal: _aborters.search.signal });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
     throw new Error(`External search failed ${res.status}: ${txt || res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  _cache.search.set(key, data);
+  return data;
 }
 
 // --- delete one exercise ---
@@ -120,22 +222,19 @@ async function importExternal(obj) {
 function renderExternalResults(list, q) {
   const out = el('external-results');
   if (!out) return;
-
   out.innerHTML = '';
 
-  const tokens = (q || '').toLowerCase().split(/\s+/).filter(Boolean);
-
-  // client-side relevance guard
+  const tokens = norm(q).split(/\s+/).filter(Boolean);
   const filtered = tokens.length
     ? list.filter(it => {
-        const name = (it.name || '').toLowerCase();
+        const name = norm(it.name || "");
         return tokens.some(t => name.includes(t));
       })
     : list.slice();
 
   const show = filtered.length ? filtered : [];
   if (!show.length) {
-    out.innerHTML = `<p class="hint">No matches for “<strong>${q}</strong>”.</p>`;
+    out.innerHTML = `<p class="hint">No results for “<strong>${q}</strong>”.</p>`;
     return;
   }
 
@@ -155,15 +254,14 @@ function renderExternalResults(list, q) {
           <div class="hint">${item.category || ''}${muscles}</div>
         </div>
         <button type="button" class="primary" id="imp-${i}">Import</button>
-      </div>
-    `;
+      </div>`;
     out.appendChild(card);
 
     card.querySelector(`#imp-${i}`).addEventListener('click', async () => {
       try {
         const saved = await importExternal(item);
         alert(`Imported: ${saved.name}`);
-        await fetchLocalExercises(); // immediately refresh local table
+        await fetchLocalExercises();
       } catch (err) {
         console.error(err);
         alert(err.message || 'Import failed');
@@ -172,27 +270,64 @@ function renderExternalResults(list, q) {
   });
 }
 
-// --- wire explore UI ---
+function attachTabs() {
+  const tabSearch = el('tab-search');
+  const tabBrowse = el('tab-browse');
+  const paneSearch = el('pane-search');
+  const paneBrowse = el('pane-browse');
+
+  if (!tabSearch || !tabBrowse || !paneSearch || !paneBrowse) return;
+
+  const activate = (which) => {
+    // buttons
+    tabSearch.classList.toggle('active', which === 'search');
+    tabBrowse.classList.toggle('active', which === 'browse');
+    // panes
+    paneSearch.classList.toggle('active', which === 'search');
+    paneBrowse.classList.toggle('active', which === 'browse');
+  };
+
+  tabSearch.addEventListener('click', () => activate('search'));
+  tabBrowse.addEventListener('click', () => activate('browse'));
+
+  // default to search on load
+  activate('search');
+}
+
 function attachExploreHandlers() {
   const input = el('external-q');
   const btn   = el('external-btn');
   const out   = el('external-results');
 
-  if (!input || !btn || !out) {
-    console.warn('[Explore] elements not found; skipping wire-up.');
-    return;
-  }
+  if (!input || !btn || !out) return;
 
-  out.innerHTML = '<p class="hint">Type a name to search WGER.</p>';
+  out.innerHTML = '<p class="hint">Type at least 2 letters…</p>';
 
   const run = async () => {
     const q = (input.value || '').trim();
-    if (!q) { out.innerHTML = '<p class="hint">Type something to search.</p>'; return; }
-    out.innerHTML = `<p class="hint">Searching “${q}”…</p>`;
+    if (q.length < 2) { out.innerHTML = '<p class="hint">Type at least 2 letters…</p>'; return; }
+
+    setLoading(out, `Searching “${q}”…`);
     try {
       const list = await searchExternal(q);
       renderExternalResults(list, q);
+
+      // Optional soft-fallback to browse by muscle if 0
+      if (!out.querySelector('.card')) {
+        const muscle = guessMuscleFromQuery(q);
+        if (muscle) {
+          setLoading(out, `No direct matches. Showing ${muscle}…`);
+          const browse = await browseExternalFetch({ muscle, limit: 20, offset: 0 });
+          renderExternalResults(browse, q);
+          if (!out.querySelector('.card')) {
+            out.innerHTML = `<p class="hint">No results for “${q}”.</p>`;
+          }
+        } else {
+          out.innerHTML = `<p class="hint">No results for “${q}”.</p>`;
+        }
+      }
     } catch (err) {
+      if (err.name === 'AbortError') return; // new search started; ignore
       console.error(err);
       out.innerHTML = `<p class="hint">Error: ${err.message || err}</p>`;
     }
@@ -200,10 +335,15 @@ function attachExploreHandlers() {
 
   btn.addEventListener('click', run);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+  input.addEventListener('input', debounce(() => {
+    // optional: run on stop-typing
+    // run();
+  }, 500));
 
-  // expose for manual testing in DevTools
+  // expose for DevTools
   window._extSearch = run;
 }
+
 
 // --- local exercises table ---
 async function fetchLocalExercises() {
@@ -295,31 +435,54 @@ async function fetchMuscles() {
   } catch (_) { /* ignore */ }
 }
 
+async function browseExternalFetch({ muscle, limit, offset }) {
+  const key = `${muscle || 'all'}|${limit}|${offset}`;
+  if (_cache.browse.has(key)) return _cache.browse.get(key);
+
+  if (_aborters.browse) _aborters.browse.abort();
+  _aborters.browse = new AbortController();
+
+  const params = new URLSearchParams();
+  if (muscle) params.set('muscle', muscle);
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+
+  const res = await fetch(`/api/external/exercises/browse?${params.toString()}`, { signal: _aborters.browse.signal });
+  if (!res.ok) throw new Error(`Browse failed ${res.status}`);
+  const data = await res.json();
+  const items = data?.items || [];
+  _cache.browse.set(key, items);
+  return items;
+}
+
 async function browseExternal(reset=false) {
   if (_browseState.loading) return;
   _browseState.loading = true;
+
   const cont = el('browse-results');
-  cont.innerHTML = cont.innerHTML || '<p class="hint">Loading…</p>';
+  if (reset) cont.innerHTML = '';
+  setLoading(cont, 'Loading…');
 
   if (reset) _browseState.offset = 0;
 
-  const params = new URLSearchParams();
-  if (_browseState.muscle) params.set('muscle', _browseState.muscle);
-  params.set('limit', String(_browseState.limit));
-  params.set('offset', String(_browseState.offset));
-
   try {
-    const res = await fetch(`/api/external/exercises/browse?${params.toString()}`);
-    if (!res.ok) throw new Error(`Browse failed ${res.status}`);
-    const data = await res.json();
-    const items = data.items || [];
-    if (reset) cont.innerHTML = '';
+    const items = await browseExternalFetch({
+      muscle: _browseState.muscle || null,
+      limit: _browseState.limit,
+      offset: _browseState.offset
+    });
 
+    if (reset) cont.innerHTML = '';
     renderBrowseResults(items, !!reset);
-    _browseState.offset = data.next_offset ?? (_browseState.offset + _browseState.limit);
+    _browseState.offset += _browseState.limit;
+
+    // enable/disable Load more
+    el('browse-more').disabled = items.length < _browseState.limit;
   } catch (err) {
-    console.error(err);
-    cont.innerHTML = `<p class="hint">Error: ${err.message || err}</p>`;
+    if (err.name !== 'AbortError') {
+      console.error(err);
+      cont.innerHTML = `<p class="hint">Error: ${err.message || err}</p>`;
+    }
   } finally {
     _browseState.loading = false;
   }
@@ -377,22 +540,25 @@ function attachBrowseHandlers() {
   });
 
   btn.addEventListener('click', () => {
-    browseExternal(true); // reset paging
+    if (!_browseState.muscle) {
+      el('browse-results').innerHTML = '<p class="hint">Pick a muscle first.</p>';
+      more.disabled = true;
+      return;
+    }
+    browseExternal(true);
   });
 
   more.addEventListener('click', () => {
-    browseExternal(false); // next page
+    browseExternal(false);
   });
-
-  // init on load
-  _browseState.muscle = sel.value || '';
-  browseExternal(true);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  attachTabs();                // <— NEW
   attachExploreHandlers();
   wireLocalFilters();
   fetchLocalExercises();
   fetchMuscles();
   attachBrowseHandlers();
+  attachAddExerciseHandler();  // <— NEW
 });
