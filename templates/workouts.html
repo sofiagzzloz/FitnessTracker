@@ -5,71 +5,162 @@
   <title>Workouts · Fitness Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    .grid { display:grid; grid-template-columns: 320px 1fr; gap:16px; }
+    .list { max-height: 60vh; overflow:auto; }
+    .wo-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+    .wo-item:last-child { border-bottom:none; }
+    .bodymap { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+    .legend { display:flex; gap:10px; align-items:center; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .dot.primary { background:#2cc1ff; }
+    .dot.secondary { background:#77d7ff; }
+    .chips { display:flex; gap:6px; flex-wrap:wrap; }
+    .chip { font-size:12px; padding:3px 8px; border-radius:999px; background:#13202a; border:1px solid #1f2e3a; }
+    .svgwrap { width:260px; height:auto; }
+    .svgwrap svg { width:100%; height:auto; display:block; }
+    .muted { color:#9aa4b2; }
+    .tight td { padding:6px 8px; }
+    .tight th { padding:6px 8px; }
+    .btn-small { padding:6px 10px; }
+    .danger { background:#3a0f12; border-color:#662126; }
+  </style>
 </head>
 <body>
-  <header class="site-header">
-    <nav class="wrap nav">
-      <a href="/" style="font-weight:800">Fitness Tracker</a>
-      <span style="flex:1"></span>
-      <a href="/exercises" class="badge">Exercises</a>
-      <a href="/workouts" class="badge">Workouts</a>
-      <a href="/sessions" class="badge">Sessions</a>
-    </nav>
-  </header>
+<header class="site-header">
+  <nav class="wrap nav">
+    <a href="/" style="font-weight:800">Fitness Tracker</a>
+    <span style="flex:1"></span>
+    <a href="/exercises" class="badge">Exercises</a>
+    <a href="/workouts" class="badge">Workouts</a>
+    <a href="/sessions" class="badge">Sessions</a>
+  </nav>
+</header>
 
-  <main class="wrap">
-    <h1>Workouts</h1>
+<main class="wrap">
+  <h1>Workouts</h1>
 
-    <section class="card fade-in" style="margin-top:12px">
-      <div class="row">
-        <div style="grid-column:span 4"><label>Name</label><input id="t-name"></div>
-        <div style="grid-column:span 6"><label>Notes</label><input id="t-notes"></div>
-        <div style="grid-column:span 2"><button id="btn-create-template" class="primary">Create</button></div>
+  <div class="grid" style="margin-top:12px">
+    <!-- Left: picker/creator -->
+    <section class="card">
+      <h3>Your workouts</h3>
+      <div class="row" style="gap:8px; align-items:flex-end">
+        <div class="form-item" style="flex:1">
+          <label>Name</label>
+          <input id="wo-new-name" placeholder="e.g. Push Day A" />
+        </div>
+        <div class="form-item">
+          <button id="wo-create" class="primary">Create</button>
+        </div>
       </div>
+
+      <div class="form-item" style="margin-top:6px">
+        <label>Filter</label>
+        <input id="wo-filter" placeholder="type to filter…" />
+      </div>
+
+      <div id="wo-list" class="list" style="margin-top:8px"></div>
     </section>
 
-    <section class="card" style="margin-top:12px">
-      <div class="row">
-        <div style="grid-column:span 12">
-          <label>Workouts</label>
-          <div id="t-list" class="row" style="gap:8px"></div>
-          <select id="t-select" class="visually-hidden"><option value=""></option></select>
-          <div style="margin-top:8px">
-            <button id="btn-refresh-templates">Refresh</button>
-            <button id="btn-delete-template" class="warn">Delete</button>
+    <!-- Right: editor + map -->
+    <section class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+        <h3 id="wo-title">No workout selected</h3>
+        <div>
+          <button id="wo-delete" class="btn-small danger" disabled>Delete workout</button>
+        </div>
+      </div>
+
+      <div id="wo-empty" class="muted" style="margin:6px 0 12px">Pick or create a workout to edit.</div>
+
+      <!-- Add item -->
+      <div id="wo-editor" style="display:none">
+        <div class="row" style="gap:8px; align-items:end">
+          <div class="form-item" style="grid-column: span 6">
+            <label>Exercise</label>
+            <select id="item-ex-select"><option value="">Choose…</option></select>
+          </div>
+          <div class="form-item" style="grid-column: span 2">
+            <label>Sets</label><input id="item-sets" type="number" min="1" placeholder="3" />
+          </div>
+          <div class="form-item" style="grid-column: span 2">
+            <label>Reps</label><input id="item-reps" type="number" min="1" placeholder="10" />
+          </div>
+          <div class="form-item" style="grid-column: span 2">
+            <label>Weight</label><input id="item-weight" type="number" step="0.5" placeholder="kg/lb" />
+          </div>
+          <div class="form-item" style="grid-column: span 12">
+            <button id="item-add" class="primary">Add to workout</button>
+          </div>
+        </div>
+
+        <!-- Items table -->
+        <table id="items-table" class="tight" style="margin-top:10px">
+          <thead>
+            <tr>
+              <th style="width:50px">#</th>
+              <th>Exercise</th>
+              <th>Planned</th>
+              <th style="width:90px" class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <!-- Muscle map -->
+        <div style="margin-top:14px">
+          <h4>Muscle map</h4>
+          <div class="legend" style="margin-bottom:6px">
+            <span class="dot primary"></span><small>Primary</small>
+            <span class="dot secondary"></span><small>Secondary</small>
+          </div>
+          <div class="bodymap">
+            <div class="svgwrap">
+              <!-- super-light schematic; ids match slugs -->
+              <svg viewBox="0 0 180 420" xmlns="http://www.w3.org/2000/svg">
+                <!-- torso -->
+                <rect x="70" y="40" width="40" height="60" fill="#0b1319" stroke="#22313f"/>
+                <!-- chest -->
+                <rect id="chest" x="60" y="40" width="60" height="30" rx="6" fill="#0b1319" stroke="#22313f"/>
+                <!-- delts -->
+                <circle id="delts" cx="50" cy="55" r="14" fill="#0b1319" stroke="#22313f"/>
+                <circle id="delts_r" cx="130" cy="55" r="14" fill="#0b1319" stroke="#22313f"/>
+                <!-- abs -->
+                <rect id="abs" x="75" y="75" width="30" height="40" rx="6" fill="#0b1319" stroke="#22313f"/>
+                <!-- arms -->
+                <rect id="biceps" x="28" y="80" width="18" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
+                <rect id="triceps" x="18" y="80" width="10" height="60" rx="5" fill="#0b1319" stroke="#22313f"/>
+                <rect id="biceps_r" x="134" y="80" width="18" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
+                <rect id="triceps_r" x="152" y="80" width="10" height="60" rx="5" fill="#0b1319" stroke="#22313f"/>
+                <!-- lats/back -->
+                <rect id="lats" x="60" y="100" width="60" height="50" rx="8" fill="#0b1319" stroke="#22313f"/>
+                <!-- hips -->
+                <rect id="glutes" x="65" y="150" width="50" height="30" rx="8" fill="#0b1319" stroke="#22313f"/>
+                <!-- legs -->
+                <rect id="quads" x="65" y="180" width="20" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
+                <rect id="hams"  x="95" y="180" width="20" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
+                <rect id="calves" x="65" y="240" width="50" height="40" rx="8" fill="#0b1319" stroke="#22313f"/>
+              </svg>
+            </div>
+            <div>
+              <div class="chips" id="chips-primary"></div>
+              <div class="chips" id="chips-secondary" style="margin-top:6px"></div>
+              <small class="muted" id="map-note" style="display:block; margin-top:8px">Add items to see muscles.</small>
+            </div>
           </div>
         </div>
       </div>
     </section>
+  </div>
+</main>
 
-    <section class="card" style="margin-top:12px">
-      <h3>Add exercise to workout</h3>
-      <div class="row">
-        <div style="grid-column:span 4"><label>Exercise</label><select id="ti-exercise"><option value="">— Select —</option></select></div>
-        <div style="grid-column:span 3"><label>Planned</label><input id="ti-planned" placeholder="e.g. 4x8 @ 60kg or 20min @ 6mph"></div>
-        <div style="grid-column:span 5"><label>Notes</label><input id="ti-notes"></div>
-        <div style="grid-column:span 2"><button id="btn-add-template-item" class="primary">Add</button></div>
-      </div>
-    </section>
+<footer class="site-footer">
+  <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
+    <small style="color:#9aa4b2">© Fitness Tracker</small>
+    <small style="color:#9aa4b2">Built for your CS/AI course</small>
+  </div>
+</footer>
 
-    <section class="card" style="margin-top:12px">
-      <div class="row">
-        <div style="grid-column:span 12">
-          <h3 style="margin-bottom:8px">Workout: <span id="active-workout-name">—</span></h3>
-          <p class="hint" id="active-workout-notes" style="margin:0 0 8px"></p>
-        </div>
-      </div>
-      <table id="template-items"><thead><tr><th>ID</th><th>Order</th><th>Exercise</th><th>Planned</th><th>Notes</th><th class="right">Actions</th></tr></thead><tbody></tbody></table>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
-      <small style="color:#9aa4b2">© Fitness Tracker</small>
-      <small style="color:#9aa4b2">Built for your CS/AI course</small>
-    </div>
-  </footer>
-
-  <script src="/static/workouts.js" defer></script>
+<script src="/static/workouts.js?v=dev1"></script>
 </body>
 </html>
