@@ -139,4 +139,4 @@ class SessionCardio(SQLModel, table=True):
     distance: Optional[float] = None
     distance_unit: Optional[str] = None
     avg_hr: Optional[int] = None
-    avg_pace: Optional[str] = None             #
+    avg_pace: Optional[str] = None             

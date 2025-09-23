@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import status
 
 from ..db import get_session
-from ..models import Exercise, WorkoutItem, SessionItem, Category
+from ..models import Exercise, WorkoutItem, SessionItem, Category, WorkoutTemplate, Session, ExerciseMuscle
 from ..schemas import ExerciseCreate, ExerciseRead, ExerciseUpdate
 
 router = APIRouter(prefix="/api/exercises", tags=["exercises"])
@@ -128,13 +128,54 @@ def delete_exercise(exercise_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     try:
+        # 1) Detach muscle links so they don't block deletion
+        links = session.exec(
+            select(ExerciseMuscle).where(ExerciseMuscle.exercise_id == exercise_id)
+        ).all()
+        for link in links:
+            session.delete(link)
+        session.flush()  # keep in same transaction
+
+        # 2) Try deleting the exercise; workouts/sessions will still block with FK 409
         session.delete(ex)
         session.commit()
         return None
+
     except IntegrityError:
         session.rollback()
-        # FK in use somewhere (workout items, session items, etc.)
+        # Still referenced by workouts/sessions (that's expected to block)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot delete exercise: it is referenced by workouts/sessions."
         )
+
+@router.get("/{exercise_id}/usage")
+def get_exercise_usage(exercise_id: int, session: Session = Depends(get_session)):
+    ex = session.get(Exercise, exercise_id)
+    if not ex:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    # Workouts (WorkoutTemplate + WorkoutItem)
+    wq = (
+        select(WorkoutTemplate)
+        .join(WorkoutItem, WorkoutItem.workout_template_id == WorkoutTemplate.id)
+        .where(WorkoutItem.exercise_id == exercise_id)
+        .order_by(WorkoutTemplate.name.asc())
+    )
+    workouts = session.exec(wq).all()
+
+    # Sessions (Session + SessionItem)
+    sq = (
+        select(Session)
+        .join(SessionItem, SessionItem.session_id == Session.id)
+        .where(SessionItem.exercise_id == exercise_id)
+        .order_by(Session.date.desc())
+    )
+    sessions_rows = session.exec(sq).all()
+
+    return {
+        "exercise": {"id": ex.id, "name": ex.name},
+        "workouts": [{"id": w.id, "name": w.name} for w in workouts],
+        "sessions": [{"id": s.id, "title": s.title, "date": str(s.date)} for s in sessions_rows],
+        "counts": {"workouts": len(workouts), "sessions": len(sessions_rows)},
+    }

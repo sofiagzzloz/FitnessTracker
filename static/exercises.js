@@ -1,18 +1,58 @@
-function el(id){ return document.getElementById(id); }
+function el(id) {
+  return document.getElementById(id);
+}
 
 // --- small helpers ---
-function debounce(fn, ms=200){
-  let t; return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
+function debounce(fn, ms = 200) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
 }
 
 let _browseState = { muscle: '', limit: 12, offset: 0, loading: false };
+
+// --- usage modal ---
+function showUsageModal(usage) {
+  const modal = el('delete-usage-modal');
+  if (!modal) return alert('This exercise is used and cannot be deleted.');
+
+  const blurb = el('usage-text');
+  const links = el('usage-links');
+
+  blurb.textContent =
+    `${usage.exercise.name} is used in ${usage.counts.workouts} workout(s) and ${usage.counts.sessions} session(s). Remove it there first.`;
+  links.innerHTML = '';
+
+  if (usage.workouts && usage.workouts.length > 0) {
+    const a = document.createElement('a');
+    a.href = `/workouts?exercise_id=${usage.exercise.id}`;
+    a.textContent = 'View related workouts';
+    links.appendChild(a);
+  }
+  if (usage.sessions && usage.sessions.length > 0) {
+    const a = document.createElement('a');
+    a.href = `/sessions?exercise_id=${usage.exercise.id}`;
+    a.textContent = 'View related sessions';
+    links.appendChild(a);
+  }
+
+  modal.classList.remove('hidden');
+}
+
+document.addEventListener('click', (ev) => {
+  if (ev.target && el('usage-close') && ev.target.id === 'usage-close') {
+    el('delete-usage-modal').classList.add('hidden');
+  }
+});
 
 // --- backend calls ---
 async function searchExternal(q) {
   const url = `/api/external/exercises?q=${encodeURIComponent(q)}&limit=10`;
   const res = await fetch(url);
   if (!res.ok) {
-    const txt = await res.text().catch(()=> '');
+    const txt = await res.text().catch(() => '');
     throw new Error(`External search failed ${res.status}: ${txt || res.statusText}`);
   }
   return res.json();
@@ -21,12 +61,48 @@ async function searchExternal(q) {
 // --- delete one exercise ---
 async function deleteExercise(id) {
   const res = await fetch(`/api/exercises/${id}`, { method: 'DELETE' });
-  if (res.status === 204) return true;
-  const txt = await res.text().catch(()=>'');
-  throw new Error(txt || `Delete failed (${res.status})`);
+
+  if (res.status === 204) {
+    return { status: "deleted" };
+  }
+
+  if (res.status === 409) {
+    // Try to load usage; if it fails, still show a generic modal
+    try {
+      const usageRes = await fetch(`/api/exercises/${id}/usage`);
+      if (usageRes.ok) {
+        const usage = await usageRes.json();
+        return { status: "in_use", usage };
+      }
+      // usage endpoint returned non-OK
+      return {
+        status: "in_use",
+        usage: {
+          exercise: { id, name: "This exercise" },
+          workouts: [],
+          sessions: [],
+          counts: { workouts: 0, sessions: 0 }
+        }
+      };
+    } catch (err) {
+      console.error("usage fetch failed", err);
+      return {
+        status: "in_use",
+        usage: {
+          exercise: { id, name: "This exercise" },
+          workouts: [],
+          sessions: [],
+          counts: { workouts: 0, sessions: 0 }
+        }
+      };
+    }
+  }
+
+  const txt = await res.text().catch(() => "");
+  return { status: "error", message: txt || `Delete failed (${res.status})` };
 }
 
-
+// --- import external exercise ---
 async function importExternal(obj) {
   const res = await fetch('/api/external/exercises/import', {
     method: 'POST',
@@ -34,7 +110,7 @@ async function importExternal(obj) {
     body: JSON.stringify(obj),
   });
   if (!res.ok) {
-    const txt = await res.text().catch(()=> '');
+    const txt = await res.text().catch(() => '');
     throw new Error(`Import failed ${res.status}: ${txt || res.statusText}`);
   }
   return res.json();
@@ -178,20 +254,29 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.ex-del');
   if (!btn) return;
+
   const id = btn.getAttribute('data-id');
   if (!id) return;
+
   const ok = confirm('Delete this exercise? This will fail if it is used in a workout or session.');
   if (!ok) return;
 
-  try {
-    await deleteExercise(id);
-    // remove row or refresh the whole list
+  const result = await deleteExercise(id);
+
+  if (result.status === "deleted") {
+    // remove row and/or refresh
     const tr = document.querySelector(`#ex-table tbody tr[data-id="${id}"]`);
-    tr && tr.remove();
-  } catch (err) {
-    console.error(err);
-    alert(err.message || 'Could not delete (it may be used by a workout/session).');
+    if (tr) tr.remove();
+    return;
   }
+
+  if (result.status === "in_use") {
+    showUsageModal(result.usage); // <- opens the modal you added to HTML
+    return;
+  }
+
+  // error fallback
+  alert(result.message || "Delete failed");
 });
 
 async function fetchMuscles() {
