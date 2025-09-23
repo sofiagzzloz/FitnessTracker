@@ -1,184 +1,308 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const $ = s => document.querySelector(s);
+function el(id) { return document.getElementById(id); }
+function h(tag, attrs={}, ...kids){
+  const n = document.createElement(tag);
+  Object.entries(attrs||{}).forEach(([k,v]) => {
+    if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k,v);
+  });
+  kids.forEach(k => n.appendChild(typeof k === 'string' ? document.createTextNode(k) : k));
+  return n;
+}
 
-  const tSelect = $('#t-select'); // kept hidden but used by existing logic
-  const tList = document.querySelector('#t-list');
-  const tiExercise = $('#ti-exercise');
-  const itemsTbody = document.querySelector('#template-items tbody');
-  const activeName = document.querySelector('#active-workout-name');
-  const activeNotes = document.querySelector('#active-workout-notes');
+// ---- state ----
+const state = {
+  workouts: [],
+  selectedId: null,
+  items: [],
+  exercises: [],
+};
 
-  const loadTemplates = async (selectIdToKeep) => {
-    try {
-      const res = await fetch('/api/workouts/templates');
-      if (!res.ok) throw new Error('Failed to load templates');
-      const templates = await res.json();
-      const opts = ['<option value=""></option>'].concat(templates.map(t => `<option value="${t.id}">${t.name}</option>`));
-      tSelect.innerHTML = opts.join('');
-      // render chips
-      tList.innerHTML = templates.map(t => {
-        const notes = (t.notes || '').replace(/"/g, '&quot;');
-        return `<button class="chip" data-id="${t.id}" data-notes="${notes}">${t.name}</button>`;
-      }).join('');
-      // activate current
-      const activate = (id) => {
-        tSelect.value = String(id);
-        Array.from(tList.querySelectorAll('.chip')).forEach(el => {
-          el.classList.toggle('active', el.getAttribute('data-id') === String(id));
-        });
-        const chip = tList.querySelector(`.chip[data-id="${id}"]`);
-        if (activeName) activeName.textContent = chip ? chip.textContent : '—';
-        if (activeNotes) activeNotes.textContent = chip ? (chip.getAttribute('data-notes') || '') : '';
-      };
-      tList.querySelectorAll('.chip').forEach(el => {
-        el.addEventListener('click', () => { activate(el.getAttribute('data-id')); loadTemplateItems(); });
-      });
-      if (templates.length === 0){ itemsTbody.innerHTML = ''; return; }
-      if (selectIdToKeep){ activate(selectIdToKeep); } else { activate(templates[0].id); }
-      loadTemplateItems();
-    } catch(err){
-      alert(err.message || 'Error loading templates');
-    }
-  };
+// ---- API helpers ----
+async function apiListWorkouts(q){
+  const res = await fetch('/api/workouts' + (q ? `?q=${encodeURIComponent(q)}` : ''));
+  return res.ok ? res.json() : [];
+}
+async function apiCreateWorkout(name){
+  const res = await fetch('/api/workouts', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+async function apiDeleteWorkout(id){
+  const res = await fetch(`/api/workouts/${id}`, { method:'DELETE' });
+  if (!res.ok) throw new Error(await res.text());
+}
+async function apiListItems(tid){
+  const res = await fetch(`/api/workouts/${tid}/items`);
+  return res.ok ? res.json() : [];
+}
+async function apiAddItem(tid, payload){
+  const res = await fetch(`/api/workouts/${tid}/items`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+async function apiDeleteItem(itemId){
+  const res = await fetch(`/api/workouts/items/${itemId}`, { method:'DELETE' });
+  if (!res.ok) throw new Error(await res.text());
+}
 
-  const loadExercisesForSelect = async () => {
-    try {
-      const res = await fetch('/api/_exercises_for_select');
-      if (!res.ok) throw new Error('Failed to load exercises');
-      const items = await res.json();
-      const opts = ['<option value="">— Select —</option>']
-        .concat(items.map(e => `<option value="${e.id}">${e.name}</option>`));
-      tiExercise.innerHTML = opts.join('');
-    } catch(err){
-      alert(err.message || 'Error loading exercises');
-    }
-  };
+async function apiListExercises(){
+  const res = await fetch('/api/exercises?limit=1000');
+  if (!res.ok) {
+    const txt = await res.text().catch(()=> '');
+    console.error('[workouts] /api/exercises failed:', res.status, txt);
+    return [];
+  }
+  return res.json();
+}
 
-  const loadTemplateItems = async () => {
-    const templateId = tSelect.value;
-    if (!templateId){ itemsTbody.innerHTML = ''; return; }
-    try {
-      const res = await fetch(`/api/workouts/templates/${templateId}/items`);
-      if (!res.ok) throw new Error('Failed to load template items');
-      const items = await res.json();
-      itemsTbody.innerHTML = items.map(i => `
-        <tr>
-          <td>${i.id}</td>
-          <td class="right">${i.order}</td>
-          <td>${i.exercise_name}</td>
-          <td><input class="ti-edit-planned" data-id="${i.id}" value="${(i.planned||'').replace(/"/g,'&quot;')}"></td>
-          <td><input class="ti-edit-notes" data-id="${i.id}" value="${(i.notes||'').replace(/"/g,'&quot;')}"></td>
-          <td class="right">
-            <button class="ti-save" data-id="${i.id}">Save</button>
-            <button class="ti-delete warn" data-id="${i.id}">Delete</button>
-          </td>
-        </tr>
-      `).join('');
+async function apiTemplateMuscles(tid){
+  const res = await fetch(`/api/workouts/${tid}/muscles`);
+  if (!res.ok) return { primary:{}, secondary:{} };
+  return res.json();
+}
 
-      itemsTbody.querySelectorAll('.ti-save').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const templateId = tSelect.value;
-          const itemId = btn.getAttribute('data-id');
-          const planned = itemsTbody.querySelector(`.ti-edit-planned[data-id="${itemId}"]`).value;
-          const notes = itemsTbody.querySelector(`.ti-edit-notes[data-id="${itemId}"]`).value;
-          try{
-            const res = await fetch(`/api/workouts/templates/${templateId}/items/${itemId}`, {
-              method: 'PUT', headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({ planned, notes })
-            });
-            if (!res.ok) throw new Error('Failed to save');
-            await loadTemplateItems();
-          } catch(err){
-            alert(err.message || 'Error saving');
-          }
-        });
-      });
+// ---- UI renderers ----
+function renderWorkoutList(){
+  const box = el('wo-list');
+  box.innerHTML = '';
+  if (!state.workouts.length) {
+    box.innerHTML = '<p class="muted">No workouts yet.</p>';
+    return;
+  }
+  state.workouts.forEach(w => {
+    const a = h('button', { class: 'tab', style:'width:100%; text-align:left' });
+    a.textContent = w.name;
+    a.addEventListener('click', () => selectWorkout(w.id));
+    if (w.id === state.selectedId) a.classList.add('active');
+    box.appendChild(a);
+  });
+}
 
-      itemsTbody.querySelectorAll('.ti-delete').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          if (!confirm('Delete this exercise from the workout?')) return;
-          const templateId = tSelect.value;
-          const itemId = btn.getAttribute('data-id');
-          try{
-            const res = await fetch(`/api/workouts/templates/${templateId}/items/${itemId}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error('Failed to delete');
-            await loadTemplateItems();
-          } catch(err){
-            alert(err.message || 'Error deleting');
-          }
-        });
-      });
-    } catch(err){
-      alert(err.message || 'Error loading items');
-    }
-  };
+function setEditorEnabled(enabled){
+  el('wo-empty').style.display = enabled ? 'none' : '';
+  el('wo-editor').style.display = enabled ? '' : 'none';
+  el('wo-delete').disabled = !enabled;
+}
 
-  $('#btn-create-template').addEventListener('click', async () => {
-    const name = ($('#t-name').value || '').trim();
-    const notes = ($('#t-notes').value || '').trim();
-    if (!name){ alert('Name is required'); return; }
-    try {
-      const res = await fetch('/api/workouts/templates', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ name, notes })
-      });
-      if (!res.ok){
-        let err; try { err = await res.json(); } catch { err = { error: 'Failed' } }
-        throw new Error(err.error || 'Failed to create');
-      }
-      const created = await res.json();
-      $('#t-name').value = '';
-      $('#t-notes').value = '';
-      await loadTemplates(created.id);
-    } catch(err){
-      alert(err.message || 'Error creating template');
+function renderItems(){
+  const tb = document.querySelector('#items-table tbody');
+  tb.innerHTML = '';
+  if (!state.items.length) {
+    tb.innerHTML = '<tr><td colspan="4" class="muted">No items yet.</td></tr>';
+    return;
+  }
+  state.items.forEach((it, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${it.exercise_id}</td>
+      <td>${planText(it)}</td>
+      <td class="right"><button class="btn-small danger" data-id="${it.id}">Remove</button></td>
+    `;
+    tb.appendChild(tr);
+  });
+
+  // resolve exercise names
+  const map = new Map(state.exercises.map(e => [e.id, e]));
+  [...tb.querySelectorAll('tr')].forEach((tr, i) => {
+    const it = state.items[i];
+    const ex = map.get(it.exercise_id);
+    if (ex) tr.children[1].textContent = ex.name;
+  });
+
+  // wire deletes
+  tb.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = Number(btn.getAttribute('data-id'));
+      if (!confirm('Remove item?')) return;
+      try {
+        await apiDeleteItem(id);
+        await refreshItems();
+      } catch (e) { alert(e.message || 'Delete failed'); }
+    });
+  });
+}
+
+function planText(it){
+  const parts = [];
+  if (it.planned_sets) parts.push(`${it.planned_sets}x`);
+  if (it.planned_reps) parts.push(`${it.planned_reps}`);
+  if (it.planned_weight) parts.push(`${it.planned_weight}`);
+  if (!parts.length) return '—';
+  return parts.join(' ');
+}
+
+// ---- MUSCLE MAP ----
+const MUSCLE_IDS = ['chest','delts','biceps','triceps','lats','quads','hams','glutes','calves','abs'];
+function resetMapColors(){
+  MUSCLE_IDS.forEach(id => {
+    const el1 = document.getElementById(id);
+    const el2 = document.getElementById(id + '_r'); // for delts/biceps/triceps right side
+    [el1, el2].forEach(node => {
+      if (node) node.setAttribute('fill', '#0b1319');
+    });
+  });
+}
+
+function applyMapColors(summary){
+  resetMapColors();
+  const prim = summary.primary || {};
+  const sec  = summary.secondary || {};
+
+  function tint(id, role){
+    const node = document.getElementById(id);
+    const nodeR = document.getElementById(id + '_r');
+    const color = role === 'primary' ? '#2cc1ff' : '#77d7ff';
+    if (node) node.setAttribute('fill', color);
+    if (nodeR) nodeR.setAttribute('fill', color);
+  }
+
+  Object.keys(prim).forEach(slug => {
+    if (MUSCLE_IDS.includes(slug)) tint(slug, 'primary');
+  });
+  Object.keys(sec).forEach(slug => {
+    if (MUSCLE_IDS.includes(slug)) {
+      // don't override primary with secondary
+      if (!prim[slug]) tint(slug, 'secondary');
     }
   });
 
-  $('#btn-delete-template').addEventListener('click', async () => {
-    const templateId = tSelect.value;
-    if (!templateId){ alert('No template selected'); return; }
-    if (!confirm('Delete this workout template?')) return;
-    try {
-      const res = await fetch(`/api/workouts/templates/${templateId}`, { method:'DELETE' });
-      if (!res.ok){
-        let err; try { err = await res.json(); } catch { err = { error: 'Failed' } }
-        throw new Error(err.error || 'Failed to delete');
-      }
-      await loadTemplates();
-    } catch(err){
-      alert(err.message || 'Error deleting template');
-    }
+  // chips
+  const cp = el('chips-primary'); cp.innerHTML = '';
+  const cs = el('chips-secondary'); cs.innerHTML = '';
+  const note = el('map-note');
+
+  const primKeys = Object.keys(prim);
+  const secKeys = Object.keys(sec);
+
+  primKeys.forEach(k => cp.appendChild(h('span', {class:'chip'}, document.createTextNode(`${k} ×${prim[k]}`))));
+  secKeys.forEach(k => {
+    if (!prim[k]) cs.appendChild(h('span', {class:'chip'}, document.createTextNode(`${k} ×${sec[k]}`)));
   });
 
-  $('#btn-refresh-templates').addEventListener('click', loadTemplates);
-  tSelect.addEventListener('change', loadTemplateItems);
+  note.textContent = (primKeys.length || secKeys.length) ? '' : 'Add items to see muscles.';
+}
 
-  $('#btn-add-template-item').addEventListener('click', async () => {
-    const templateId = tSelect.value;
-    if (!templateId){ alert('Create or select a template first'); return; }
-    const exercise_id = tiExercise.value;
-    const planned = ($('#ti-planned').value || '').trim();
-    const notes = ($('#ti-notes').value || '').trim();
-    if (!exercise_id){ alert('Pick an exercise'); return; }
-    try {
-      const res = await fetch(`/api/workouts/templates/${templateId}/items`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ exercise_id, planned, notes })
-      });
-      if (!res.ok){
-        let err; try { err = await res.json(); } catch { err = { error: 'Failed' } }
-        throw new Error(err.error || 'Failed to add');
-      }
-      $('#ti-planned').value = '';
-      $('#ti-notes').value = '';
-      await loadTemplateItems();
-    } catch(err){
-      alert(err.message || 'Error adding item');
+// ---- actions ----
+async function selectWorkout(id){
+  state.selectedId = id;
+  const w = state.workouts.find(x => x.id === id);
+  el('wo-title').textContent = w ? w.name : 'Workout';
+  setEditorEnabled(true);
+  renderWorkoutList();
+  await refreshItems();
+}
+
+async function refreshItems(){
+  if (!state.selectedId) return;
+  state.items = await apiListItems(state.selectedId);
+  renderItems();
+  const summary = await apiTemplateMuscles(state.selectedId);
+  applyMapColors(summary);
+}
+
+async function refreshWorkouts(){
+  state.workouts = await apiListWorkouts(el('wo-filter').value.trim());
+  renderWorkoutList();
+}
+
+async function initExercisesSelect(){
+  try {
+    console.log('[workouts] loading exercises…');
+    state.exercises = await apiListExercises();
+    console.log('[workouts] exercises count =', state.exercises.length);
+
+    const sel = el('item-ex-select');
+    if (!sel) { console.warn('[workouts] missing #item-ex-select'); return; }
+
+    sel.innerHTML = '<option value="">Choose…</option>';
+    if (!state.exercises.length) {
+      // show a friendly hint
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No local exercises yet — import or add some on the Exercises page';
+      sel.appendChild(opt);
+      return;
     }
+
+    state.exercises.forEach(ex => {
+      const opt = document.createElement('option');
+      opt.value = ex.id;
+      opt.textContent = ex.name;  // <- show names, not IDs
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('[workouts] failed to load exercises', e);
+    alert(e.message || 'Could not load exercises list.');
+  }
+}
+
+// ---- wiring ----
+document.addEventListener('DOMContentLoaded', async () => {
+  // create
+  el('wo-create').addEventListener('click', async () => {
+    const name = (el('wo-new-name').value || '').trim();
+    if (!name) return alert('Name required');
+    try {
+      const w = await apiCreateWorkout(name);
+      el('wo-new-name').value = '';
+      await refreshWorkouts();
+      await selectWorkout(w.id);
+    } catch (e) { alert(e.message || 'Create failed'); }
   });
 
-  // Initial loads
-  Promise.all([loadTemplates(), loadExercisesForSelect()]);
+  // filter
+  el('wo-filter').addEventListener('input', () => {
+    clearTimeout(window._wo_t);
+    window._wo_t = setTimeout(refreshWorkouts, 250);
+  });
+
+  // delete workout
+  el('wo-delete').addEventListener('click', async () => {
+    if (!state.selectedId) return;
+    if (!confirm('Delete this workout? Items will be removed.')) return;
+    try {
+      await apiDeleteWorkout(state.selectedId);
+      state.selectedId = null;
+      setEditorEnabled(false);
+      await refreshWorkouts();
+      resetMapColors();
+      el('chips-primary').innerHTML = '';
+      el('chips-secondary').innerHTML = '';
+      el('items-table').querySelector('tbody').innerHTML = '';
+      el('wo-title').textContent = 'No workout selected';
+    } catch (e) { alert(e.message || 'Delete failed'); }
+  });
+
+  // add item
+  el('item-add').addEventListener('click', async () => {
+    if (!state.selectedId) return;
+    const exId = Number(el('item-ex-select').value);
+    if (!exId) return alert('Choose an exercise');
+    const payload = {
+      exercise_id: exId,
+      planned_sets: toInt(el('item-sets').value),
+      planned_reps: toInt(el('item-reps').value),
+      planned_weight: toFloat(el('item-weight').value),
+    };
+    try {
+      await apiAddItem(state.selectedId, payload);
+      // clear
+      el('item-sets').value = '';
+      el('item-reps').value = '';
+      el('item-weight').value = '';
+      await refreshItems();
+    } catch (e) { alert(e.message || 'Add failed'); }
+  });
+
+  await initExercisesSelect();
+  await refreshWorkouts();
+  setEditorEnabled(false);
+  resetMapColors();
 });
 
+// utils
+function toInt(v){ const n = parseInt(v,10); return Number.isFinite(n) ? n : null; }
+function toFloat(v){ const n = parseFloat(v); return Number.isFinite(n) ? n : null; }

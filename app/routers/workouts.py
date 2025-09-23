@@ -3,23 +3,12 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlmodel import Session as DBSession, select
+from sqlmodel import Session as DBSession, select, col
 
 from ..db import get_session
-from ..models import (
-    WorkoutTemplate,
-    WorkoutItem,
-    Exercise,
-    Session,           # logged session
-    SessionItem,       # items inside a session
-)
-from ..schemas import (
-    WorkoutTemplateCreate,
-    WorkoutTemplateRead,
-    WorkoutItemCreate,
-    WorkoutItemRead,
-    SessionRead,
-)
+from ..models import WorkoutTemplate, WorkoutItem, Exercise, Session, SessionItem, Muscle, ExerciseMuscle       # items inside a session
+from ..schemas import WorkoutTemplateCreate, WorkoutTemplateRead, WorkoutItemCreate, WorkoutItemRead, SessionRead
+
 
 router = APIRouter(prefix="/api/workouts", tags=["workouts"])
 
@@ -222,3 +211,35 @@ def make_session_from_template(
     session.commit()
     session.refresh(ss)
     return ss
+
+@router.get("/{template_id}/muscles")
+def get_template_muscles(template_id: int, session: DBSession = Depends(get_session)):
+    # verify template exists
+    t = session.get(WorkoutTemplate, template_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="template not found")
+
+    # items for this template
+    items = session.exec(
+        select(WorkoutItem).where(WorkoutItem.workout_template_id == template_id)
+    ).all()
+    if not items:
+        return {"template_id": template_id, "primary": {}, "secondary": {}}
+
+    ex_ids = [it.exercise_id for it in items]
+    # join exercise->muscle links
+    links = session.exec(
+        select(ExerciseMuscle, Muscle)
+        .join(Muscle, ExerciseMuscle.muscle_id == Muscle.id)
+        .where(ExerciseMuscle.exercise_id.in_(ex_ids))
+    ).all()
+
+    prim: dict[str, int] = {}
+    sec: dict[str, int] = {}
+    for link, m in links:
+        if str(link.role) == "primary":
+            prim[m.slug] = prim.get(m.slug, 0) + 1
+        else:
+            sec[m.slug] = sec.get(m.slug, 0) + 1
+
+    return {"template_id": template_id, "primary": prim, "secondary": sec}
