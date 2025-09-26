@@ -87,3 +87,12 @@ tbody tr:hover { background: #11141a; }
 @keyframes fade-in { from{opacity:0; transform:translateY(2px)} to{opacity:1; transform:none} }
 
 @media (max-width: 640px){ tbody td { padding: 8px; } }
+
+/* ensure the native dropdown and its popup are click-through */
+#item-ex-select { position: relative; z-index: 10; pointer-events: auto; }
+
+/* these containers must not clip the popup list */
+.card, .row, .form-item { overflow: visible; }
+
+/* just in case a sibling is overlapping */
+#item-add { position: relative; z-index: 1; }

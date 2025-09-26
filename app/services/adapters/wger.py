@@ -108,24 +108,18 @@ def _cand_from_translation(t_data: dict) -> list[tuple[int, str]]:
 # -----------------------------
 def _score_name(name: str, q_tokens: List[str]) -> Tuple[int, int, int, int]:
     """
-    Higher is better.
-    Returns (exact_phrase, prefix_hits, exact_token_hits, -name_len)
-
-    * exact_phrase: 1 if the normalized name equals the full normalized query string
-    * prefix_hits:  number of query tokens that are a prefix of any word in the name
-    * exact_token_hits: number of tokens that exist as whole words in the name
-    * -name_len: tie-breaker favoring shorter normalized names
+    Higher is better:
+      (exact_phrase, exact_word_hits, prefix_hits, -name_len)
     """
     n_norm = _norm(name)
     if not n_norm:
         return (0, 0, 0, 0)
 
     words = n_norm.split()
-    exact_token_hits = sum(1 for t in q_tokens if t in words)
+    exact_word_hits = sum(1 for t in q_tokens if t in words)
     prefix_hits = sum(1 for t in q_tokens if any(w.startswith(t) for w in words))
     exact_phrase = 1 if n_norm == " ".join(q_tokens) else 0
-    return (exact_phrase, prefix_hits, exact_token_hits, -len(n_norm))
-
+    return (exact_phrase, exact_word_hits, prefix_hits, -len(n_norm))
 
 # -----------------------------
 # Public: Search (strict AND)

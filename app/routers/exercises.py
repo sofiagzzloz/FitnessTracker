@@ -69,7 +69,7 @@ def list_exercises(
     if category is not None:
         stmt = stmt.where(Exercise.category == category)
 
-    stmt = stmt.order_by(Exercise.name.asc() if sort == "name" else Exercise.id.asc())
+    stmt = stmt.order_by(Exercise.id.asc())
     stmt = stmt.limit(limit).offset(offset)
 
     return session.exec(stmt).all()
