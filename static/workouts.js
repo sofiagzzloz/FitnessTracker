@@ -48,19 +48,20 @@ async function apiDeleteItem(itemId){
 }
 
 async function apiListExercises(){
-  const res = await fetch('/api/exercises?limit=1000');
-  if (!res.ok) {
-    const txt = await res.text().catch(()=> '');
-    console.error('[workouts] /api/exercises failed:', res.status, txt);
-    return [];
-  }
-  return res.json();
-}
+  const cap = 200;
+  // simple single page within server cap
+  let res = await fetch(`/api/exercises?limit=${cap}`);
+  if (res.ok) return res.json();
 
-async function apiTemplateMuscles(tid){
-  const res = await fetch(`/api/workouts/${tid}/muscles`);
-  if (!res.ok) return { primary:{}, secondary:{} };
-  return res.json();
+  // if somehow 422 again, retry with a smaller number
+  if (res.status === 422) {
+    res = await fetch('/api/exercises?limit=100');
+    return res.ok ? res.json() : [];
+  }
+
+  const txt = await res.text().catch(()=> '');
+  console.error('[workouts] /api/exercises failed:', res.status, txt);
+  return [];
 }
 
 // ---- UI renderers ----
@@ -194,13 +195,24 @@ async function selectWorkout(id){
   renderWorkoutList();
   await refreshItems();
 }
+async function apiTemplateMuscles(tid){
+  const res = await fetch(`/api/workouts/${tid}/muscles`);
+  if (!res.ok) return { primary:{}, secondary:{} };
+  return res.json();
+}
 
 async function refreshItems(){
   if (!state.selectedId) return;
   state.items = await apiListItems(state.selectedId);
   renderItems();
-  const summary = await apiTemplateMuscles(state.selectedId);
-  applyMapColors(summary);
+
+  try {
+    const summary = await apiTemplateMuscles(state.selectedId);
+    applyMapColors(summary);
+  } catch (e) {
+    console.error('[workouts] muscle map load failed:', e);
+    applyMapColors({ primary:{}, secondary:{} }); // keep UI stable
+  }
 }
 
 async function refreshWorkouts(){
@@ -213,6 +225,7 @@ async function initExercisesSelect(){
     console.log('[workouts] loading exercises…');
     state.exercises = await apiListExercises();
     console.log('[workouts] exercises count =', state.exercises.length);
+    console.log('[workouts] loaded exercises:', state.exercises.length, state.exercises.slice(0, 5));
 
     const sel = el('item-ex-select');
     if (!sel) { console.warn('[workouts] missing #item-ex-select'); return; }
@@ -301,6 +314,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   await refreshWorkouts();
   setEditorEnabled(false);
   resetMapColors();
+});
+
+const sel = el('item-ex-select');
+sel.addEventListener('change', () => {
+  const id = Number(sel.value);
+  const ex = state.exercises.find(e => e.id === id);
+  console.log('[workouts] selected:', id, ex && ex.name);
 });
 
 // utils

@@ -3,15 +3,20 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlmodel import Session as DBSession, select, col
+from sqlmodel import Session as DBSession, select
 
 from ..db import get_session
-from ..models import WorkoutTemplate, WorkoutItem, Exercise, Session, SessionItem, Muscle, ExerciseMuscle       # items inside a session
-from ..schemas import WorkoutTemplateCreate, WorkoutTemplateRead, WorkoutItemCreate, WorkoutItemRead, SessionRead
-
+from ..models import (
+    WorkoutTemplate, WorkoutItem, Exercise,
+    Session, SessionItem, Muscle, ExerciseMuscle
+)
+from ..schemas import (
+    WorkoutTemplateCreate, WorkoutTemplateRead,
+    WorkoutItemCreate, WorkoutItemRead,
+    SessionRead
+)
 
 router = APIRouter(prefix="/api/workouts", tags=["workouts"])
-
 
 # ---------- Templates ----------
 @router.get("", response_model=List[WorkoutTemplateRead])
@@ -25,7 +30,6 @@ def list_templates(
     stmt = stmt.order_by(WorkoutTemplate.created_at.desc(), WorkoutTemplate.id.desc())
     return session.exec(stmt).all()
 
-
 @router.post("", response_model=WorkoutTemplateRead, status_code=201)
 def create_template(
     payload: WorkoutTemplateCreate,
@@ -34,13 +38,11 @@ def create_template(
     name = (payload.name or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="name is required")
-
     t = WorkoutTemplate(name=name, notes=(payload.notes or None))
     session.add(t)
     session.commit()
     session.refresh(t)
     return t
-
 
 @router.get("/{template_id}", response_model=WorkoutTemplateRead)
 def get_template(template_id: int, session: DBSession = Depends(get_session)):
@@ -49,14 +51,11 @@ def get_template(template_id: int, session: DBSession = Depends(get_session)):
         raise HTTPException(status_code=404, detail="template not found")
     return t
 
-
 @router.delete("/{template_id}", status_code=204)
 def delete_template(template_id: int, session: DBSession = Depends(get_session)):
     t = session.get(WorkoutTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="template not found")
-
-    # delete its items first
     items = session.exec(
         select(WorkoutItem).where(WorkoutItem.workout_template_id == template_id)
     ).all()
@@ -66,14 +65,12 @@ def delete_template(template_id: int, session: DBSession = Depends(get_session))
     session.commit()
     return None
 
-
 # ---------- Template Items ----------
 @router.get("/{template_id}/items", response_model=List[WorkoutItemRead])
 def list_template_items(template_id: int, session: DBSession = Depends(get_session)):
     t = session.get(WorkoutTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="template not found")
-
     stmt = (
         select(WorkoutItem)
         .where(WorkoutItem.workout_template_id == template_id)
@@ -81,31 +78,36 @@ def list_template_items(template_id: int, session: DBSession = Depends(get_sessi
     )
     return session.exec(stmt).all()
 
-
 @router.post("/{template_id}/items", response_model=WorkoutItemRead, status_code=201)
 def add_template_item(
     template_id: int,
     payload: WorkoutItemCreate,
     session: DBSession = Depends(get_session),
 ):
+    # verify template + exercise
     t = session.get(WorkoutTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="template not found")
-
     ex = session.get(Exercise, payload.exercise_id)
     if not ex:
         raise HTTPException(status_code=404, detail="exercise not found")
 
-    # find next order
-    max_order = session.exec(
-        select(WorkoutItem.order_index).where(WorkoutItem.workout_template_id == template_id)
-    ).all()
-    next_order = (max([o for o in max_order if o is not None], default=0) + 1) if max_order else 1
+    # robust "append to end" — ignore incoming order_index
+    cur_max_row = session.exec(
+        select(func.max(WorkoutItem.order_index)).where(
+            WorkoutItem.workout_template_id == template_id
+        )
+    ).first()
+    cur_max = (
+        cur_max_row if isinstance(cur_max_row, int)
+        else (cur_max_row[0] if cur_max_row else 0)
+    ) or 0
+    next_order = cur_max + 1
 
     it = WorkoutItem(
         workout_template_id=template_id,
         exercise_id=payload.exercise_id,
-        order_index=payload.order_index if payload.order_index is not None else next_order,
+        order_index=next_order,
         planned_sets=payload.planned_sets,
         planned_reps=payload.planned_reps,
         planned_weight=payload.planned_weight,
@@ -118,40 +120,47 @@ def add_template_item(
     session.add(it)
     session.commit()
     session.refresh(it)
-    return it
 
+    # optional safety: resequence to ensure contiguous 1..n
+    items = session.exec(
+        select(WorkoutItem)
+        .where(WorkoutItem.workout_template_id == template_id)
+        .order_by(WorkoutItem.order_index.asc(), WorkoutItem.id.asc())
+    ).all()
+    for idx, obj in enumerate(items, start=1):
+        if obj.order_index != idx:
+            obj.order_index = idx
+            session.add(obj)
+    session.commit()
+
+    return it
 
 @router.patch("/items/{item_id}", response_model=WorkoutItemRead)
 def update_template_item(
     item_id: int,
-    payload: WorkoutItemCreate,  # reuse; PATCH will use partial fields via exclude_unset
+    payload: WorkoutItemCreate,  # PATCH uses partial via exclude_unset
     session: DBSession = Depends(get_session),
 ):
     it = session.get(WorkoutItem, item_id)
     if not it:
         raise HTTPException(status_code=404, detail="item not found")
-
     data = payload.model_dump(exclude_unset=True)
     for field, value in data.items():
         setattr(it, field, value)
-
     session.add(it)
     session.commit()
     session.refresh(it)
     return it
-
 
 @router.delete("/items/{item_id}", status_code=204)
 def delete_template_item(item_id: int, session: DBSession = Depends(get_session)):
     it = session.get(WorkoutItem, item_id)
     if not it:
         raise HTTPException(status_code=404, detail="item not found")
-
     template_id = it.workout_template_id
     session.delete(it)
     session.commit()
-
-    # resequence remaining
+    # resequence after delete
     items = session.exec(
         select(WorkoutItem)
         .where(WorkoutItem.workout_template_id == template_id)
@@ -164,7 +173,6 @@ def delete_template_item(item_id: int, session: DBSession = Depends(get_session)
     session.commit()
     return None
 
-
 # ---------- Make Session from Template (date <= today) ----------
 @router.post("/{template_id}/make-session", response_model=SessionRead, status_code=201)
 def make_session_from_template(
@@ -174,10 +182,8 @@ def make_session_from_template(
     notes: Optional[str] = None,
     session: DBSession = Depends(get_session),
 ):
-    # no future logs
     if session_date > dt_date.today():
         raise HTTPException(status_code=422, detail="You can only log sessions for today or earlier.")
-
     t = session.get(WorkoutTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="template not found")
@@ -192,13 +198,11 @@ def make_session_from_template(
     session.commit()
     session.refresh(ss)
 
-    # clone items
     items = session.exec(
         select(WorkoutItem)
         .where(WorkoutItem.workout_template_id == template_id)
         .order_by(WorkoutItem.order_index.asc(), WorkoutItem.id.asc())
     ).all()
-
     for idx, src in enumerate(items, start=1):
         si = SessionItem(
             session_id=ss.id,
@@ -207,19 +211,17 @@ def make_session_from_template(
             notes=src.notes,
         )
         session.add(si)
-
     session.commit()
     session.refresh(ss)
     return ss
 
+# ---------- Muscle summary for a template ----------
 @router.get("/{template_id}/muscles")
 def get_template_muscles(template_id: int, session: DBSession = Depends(get_session)):
-    # verify template exists
     t = session.get(WorkoutTemplate, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="template not found")
 
-    # items for this template
     items = session.exec(
         select(WorkoutItem).where(WorkoutItem.workout_template_id == template_id)
     ).all()
@@ -227,7 +229,6 @@ def get_template_muscles(template_id: int, session: DBSession = Depends(get_sess
         return {"template_id": template_id, "primary": {}, "secondary": {}}
 
     ex_ids = [it.exercise_id for it in items]
-    # join exercise->muscle links
     links = session.exec(
         select(ExerciseMuscle, Muscle)
         .join(Muscle, ExerciseMuscle.muscle_id == Muscle.id)
@@ -243,3 +244,18 @@ def get_template_muscles(template_id: int, session: DBSession = Depends(get_sess
             sec[m.slug] = sec.get(m.slug, 0) + 1
 
     return {"template_id": template_id, "primary": prim, "secondary": sec}
+
+# ---------- Resequence (by creation order) ----------
+@router.post("/{template_id}/resequence", status_code=204)
+def resequence_template(template_id: int, session: DBSession = Depends(get_session)):
+    items = session.exec(
+        select(WorkoutItem)
+        .where(WorkoutItem.workout_template_id == template_id)
+        .order_by(WorkoutItem.id.asc())
+    ).all()
+    for idx, obj in enumerate(items, start=1):
+        if obj.order_index != idx:
+            obj.order_index = idx
+            session.add(obj)
+    session.commit()
+    return None
