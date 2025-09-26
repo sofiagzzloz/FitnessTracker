@@ -96,3 +96,34 @@ tbody tr:hover { background: #11141a; }
 
 /* just in case a sibling is overlapping */
 #item-add { position: relative; z-index: 1; }
+
+.svgwrap {
+  position: relative;
+  width: 260px;
+}
+
+.svgwrap img {
+  width: 100%;
+  display: block;
+}
+
+#muscle-hotspots {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* don’t block clicks */
+}
+
+.hotspot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #2cc1ff;
+  box-shadow: 0 0 8px rgba(44,193,255,0.6);
+}
+.hotspot.secondary {
+  background: #77d7ff;
+}

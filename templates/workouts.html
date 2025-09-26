@@ -114,42 +114,29 @@
             <span class="dot primary"></span><small>Primary</small>
             <span class="dot secondary"></span><small>Secondary</small>
           </div>
-          <div class="bodymap">
-            <div class="svgwrap">
-              <!-- super-light schematic; ids match slugs -->
-              <svg viewBox="0 0 180 420" xmlns="http://www.w3.org/2000/svg">
-                <!-- torso -->
-                <rect x="70" y="40" width="40" height="60" fill="#0b1319" stroke="#22313f"/>
-                <!-- chest -->
-                <rect id="chest" x="60" y="40" width="60" height="30" rx="6" fill="#0b1319" stroke="#22313f"/>
-                <!-- delts -->
-                <circle id="delts" cx="50" cy="55" r="14" fill="#0b1319" stroke="#22313f"/>
-                <circle id="delts_r" cx="130" cy="55" r="14" fill="#0b1319" stroke="#22313f"/>
-                <!-- abs -->
-                <rect id="abs" x="75" y="75" width="30" height="40" rx="6" fill="#0b1319" stroke="#22313f"/>
-                <!-- arms -->
-                <rect id="biceps" x="28" y="80" width="18" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
-                <rect id="triceps" x="18" y="80" width="10" height="60" rx="5" fill="#0b1319" stroke="#22313f"/>
-                <rect id="biceps_r" x="134" y="80" width="18" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
-                <rect id="triceps_r" x="152" y="80" width="10" height="60" rx="5" fill="#0b1319" stroke="#22313f"/>
-                <!-- lats/back -->
-                <rect id="lats" x="60" y="100" width="60" height="50" rx="8" fill="#0b1319" stroke="#22313f"/>
-                <!-- hips -->
-                <rect id="glutes" x="65" y="150" width="50" height="30" rx="8" fill="#0b1319" stroke="#22313f"/>
-                <!-- legs -->
-                <rect id="quads" x="65" y="180" width="20" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
-                <rect id="hams"  x="95" y="180" width="20" height="60" rx="8" fill="#0b1319" stroke="#22313f"/>
-                <rect id="calves" x="65" y="240" width="50" height="40" rx="8" fill="#0b1319" stroke="#22313f"/>
-              </svg>
+        
+          
+          <div class="svgwrap">
+            <!-- FRONT AND BACK-->
+            <div class="body" title="Front">
+              <div class="bodymap">
+                <div class="svgwrap">
+                  <img id="body-front" src="/static/img/body-front.png" alt="Body Front" />
+                  <img id="body-back" src="/static/img/body-back.png" alt="Body Back" style="margin-top:20px" />
+                  <!-- hotspots will be drawn on top with absolute positioning -->
+                  <div id="muscle-hotspots"></div>
+                </div>
+              </div>
             </div>
+          
             <div>
               <div class="chips" id="chips-primary"></div>
               <div class="chips" id="chips-secondary" style="margin-top:6px"></div>
-              <small class="muted" id="map-note" style="display:block; margin-top:8px">Add items to see muscles.</small>
+              <small class="muted" id="map-note" style="display:block; margin-top:8px">
+                Add items to see muscles.
+              </small>
             </div>
           </div>
-        </div>
-      </div>
     </section>
   </div>
 </main>
