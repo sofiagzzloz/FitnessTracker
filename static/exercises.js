@@ -9,13 +9,34 @@ function debounce(fn, ms = 200) {
   };
 }
 
-// Normalize (remove accents) without \p{Diacritic}
+// Normalize (remove accents) + lowercase + strip punctuation + collapse spaces
 function norm(s) {
-  return (s || "")
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  if (!s) return "";
+  return s
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "") // strip accents
+    .toLowerCase()
+    .replace(/[^\w\s]+/g, " ") // drop punctuation
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Naive singularization to mirror backend ('presses'->'press', 'squats'->'squat')
+function _singular(t) {
+  if (t.length > 3 && /[^aeiou]es$/.test(t)) return t.slice(0, -2);
+  if (t.length > 3 && t.endsWith("s")) return t.slice(0, -1);
+  return t;
+}
+
+// Tokenize with normalization + singularization
+function tokens(s) {
+  return norm(s).split(" ").filter(Boolean).map(_singular);
+}
+
+// Strict token-AND check (mirror backend)
+function passAllTokens(name, q) {
+  const n = norm(name);
+  const qt = tokens(q);
+  return qt.length === 0 || qt.every(t => n.includes(t));
 }
 
 function setLoading(elm, msg = "Loading…") {
@@ -122,7 +143,8 @@ document.addEventListener("click", (ev) => {
 // External search (NAME ONLY) — show API results as-is
 // -----------------------------------------------------
 async function searchExternal(q) {
-  const key = norm(q);
+  // Use normalized+singularized tokens as cache key so 'squats' & 'squat' share cache
+  const key = tokens(q).join(" ");
   if (_cache.search.has(key)) return _cache.search.get(key);
 
   if (_aborters.search) _aborters.search.abort();
@@ -146,25 +168,9 @@ function renderExternalResults(list, q) {
   if (!out) return;
   out.innerHTML = "";
 
-  // NEW: filter by name tokens, all tokens must appear in the name
-  const tokens = (q || "")
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-
+  // Mirror backend: strict AND of normalized/singularized tokens
   const filtered = Array.isArray(list)
-    ? (tokens.length
-        ? list.filter(it => {
-            const n = (it.name || "")
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .toLowerCase();
-            return tokens.every(t => n.includes(t));
-          })
-        : list)
+    ? (tokens(q).length ? list.filter(it => passAllTokens(it.name || "", q)) : list)
     : [];
 
   if (!filtered.length) {
@@ -196,7 +202,7 @@ function renderExternalResults(list, q) {
       importBtn.addEventListener("click", async () => {
         try {
           const saved = await importExternal(item);
-        alert(`Imported: ${saved.name}`);
+          alert(`Imported: ${saved.name}`);
           await fetchLocalExercises();
         } catch (err) {
           console.error(err);

@@ -1,4 +1,6 @@
 import asyncio
+import re
+import unicodedata
 from typing import List, Dict, Tuple
 
 import httpx
@@ -6,10 +8,49 @@ import httpx
 WGER_API = "https://wger.de/api/v2"
 
 
+# -----------------------------
+# Normalization & token helpers
+# -----------------------------
+_PUNCT_RE = re.compile(r"[^\w\s]+")
+_WS_RE = re.compile(r"\s+")
+
+
+def _strip_accents(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+
+def _norm(s: str) -> str:
+    """lowercase, strip accents, remove punctuation, collapse spaces."""
+    if not s:
+        return ""
+    s = _strip_accents(s).lower()
+    s = _PUNCT_RE.sub(" ", s)
+    s = _WS_RE.sub(" ", s).strip()
+    return s
+
+
+def _singularize_token(t: str) -> str:
+    """Very naive singularization to make 'squats' → 'squat', 'presses' → 'press'."""
+    if len(t) > 3 and re.search(r"[^aeiou]es$", t):
+        return t[:-2]
+    if len(t) > 3 and t.endswith("s"):
+        return t[:-1]
+    return t
+
+
+def _tokens(s: str) -> List[str]:
+    return [_singularize_token(t) for t in _norm(s).split() if t]
+
+
 def _norm_name(s: str) -> str:
+    """Preserve your original whitespace-collapse utility where needed."""
     return " ".join((s or "").strip().split())
 
 
+# -----------------------------
+# Domain helpers
+# -----------------------------
 def muscles_map_wger() -> Dict[int, str]:
     # WGER muscle ids → simple slugs for your UI
     return {
@@ -34,6 +75,9 @@ def category_for(name: str) -> str:
     return "cardio" if any(t in n for t in ["run", "treadmill", "bike", "row"]) else "strength"
 
 
+# -----------------------------
+# HTTP helpers
+# -----------------------------
 async def _fetch_exercise_detail(client: httpx.AsyncClient, ex_id: int) -> dict:
     try:
         r = await client.get(f"{WGER_API}/exercise/{ex_id}/")
@@ -42,72 +86,129 @@ async def _fetch_exercise_detail(client: httpx.AsyncClient, ex_id: int) -> dict:
     except httpx.HTTPError:
         return {}
 
+async def _fetch_json(client: httpx.AsyncClient, url: str, params: dict) -> dict:
+    r = await client.get(url, params=params)
+    r.raise_for_status()
+    return r.json()
 
-def _score_name(name: str, tokens: List[str]) -> Tuple[int, int, int]:
+def _cand_from_translation(t_data: dict) -> list[tuple[int, str]]:
+    seen: set[int] = set()
+    out: list[tuple[int, str]] = []
+    for tr in t_data.get("results", []) or []:
+        ex_id = tr.get("exercise")
+        name = _norm_name(tr.get("name") or "")
+        if not ex_id or not name or ex_id in seen:
+            continue
+        seen.add(ex_id)
+        out.append((ex_id, name))
+    return out
+
+# -----------------------------
+# Scoring
+# -----------------------------
+def _score_name(name: str, q_tokens: List[str]) -> Tuple[int, int, int, int]:
     """
     Higher is better.
-    - matches: how many tokens appear
-    - prefix:   whether any token is a prefix of a word (bonus)
-    - exact:    exact case-insensitive equality (big bonus)
+    Returns (exact_phrase, prefix_hits, exact_token_hits, -name_len)
+
+    * exact_phrase: 1 if the normalized name equals the full normalized query string
+    * prefix_hits:  number of query tokens that are a prefix of any word in the name
+    * exact_token_hits: number of tokens that exist as whole words in the name
+    * -name_len: tie-breaker favoring shorter normalized names
     """
-    n = (name or "").lower()
-    words = n.split()
-    matches = sum(1 for t in tokens if t in n)
-    prefix = 1 if any(any(w.startswith(t) for w in words) for t in tokens) else 0
-    exact = 1 if n == " ".join(tokens) else 0
-    return (exact, prefix, matches)
+    n_norm = _norm(name)
+    if not n_norm:
+        return (0, 0, 0, 0)
+
+    words = n_norm.split()
+    exact_token_hits = sum(1 for t in q_tokens if t in words)
+    prefix_hits = sum(1 for t in q_tokens if any(w.startswith(t) for w in words))
+    exact_phrase = 1 if n_norm == " ".join(q_tokens) else 0
+    return (exact_phrase, prefix_hits, exact_token_hits, -len(n_norm))
 
 
+# -----------------------------
+# Public: Search (strict AND)
+# -----------------------------
 async def search_wger(query: str, limit: int = 20) -> List[dict]:
-    q = (query or "").strip()
-    if not q:
+    """
+    Strategy:
+      - Page through /exercise-translation/?language=2 (no server-side filters)
+      - Locally normalize + strict token-AND on the English name
+      - For matched exercise ids, fetch /exercise/<id>/ to get muscles (stable)
+      - Rank deterministically and cap to `limit`
+    """
+    q_raw = (query or "").strip()
+    if not q_raw:
         return []
 
     headers = {"User-Agent": "fitness-tracker-dev/0.1"}
     limit = max(1, min(limit, 50))
-    fetch_size = max(limit * 3, 30)
-    tokens = [t for t in q.lower().split() if t]
+    soft_cap = max(limit * 5, 100)
+    q_tokens = _tokens(q_raw)
+    if not q_tokens:
+        return []
+
     mm = muscles_map_wger()
 
-    async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
-        t_res = await client.get(
-            f"{WGER_API}/exercise-translation/",
-            params={"language": 2, "limit": fetch_size, "name__icontains": q},
-        )
-        t_res.raise_for_status()
-        t_data = t_res.json()
+    async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+        # 1) Sweep translations and filter locally by strict AND
+        page_size = 100
+        max_pages = 20
+        offset = 0
+        cand: list[tuple[int, str]] = []
 
-        seen: set[int] = set()
-        candidates: List[Tuple[int, str]] = []
-        for tr in t_data.get("results", []):
-            ex_id = tr.get("exercise")
-            name = _norm_name(tr.get("name") or "")
-            if not ex_id or not name or ex_id in seen:
-                continue
-            seen.add(ex_id)
-            candidates.append((ex_id, name))
+        for _ in range(max_pages):
+            try:
+                t_data = await _fetch_json(
+                    client,
+                    f"{WGER_API}/exercise-translation/",
+                    {"language": 2, "limit": page_size, "offset": offset},
+                )
+            except httpx.HTTPError:
+                break
 
-        if not candidates:
+            results = t_data.get("results", []) or []
+            if not results:
+                break
+
+            for tr in results:
+                ex_id = tr.get("exercise")
+                name = _norm_name(tr.get("name") or "")
+                if not ex_id or not name:
+                    continue
+                if all(t in _norm(name) for t in q_tokens):
+                    cand.append((ex_id, name))
+                    if len(cand) >= soft_cap:
+                        break
+            if len(cand) >= soft_cap:
+                break
+            offset += page_size
+
+        if not cand:
             return []
 
-        # fetch details in batches (as you already do) ...
+        # Dedup by id, keep first name
+        seen_ids: set[int] = set()
+        unique_cand: list[tuple[int, str]] = []
+        for ex_id, name in cand:
+            if ex_id in seen_ids:
+                continue
+            seen_ids.add(ex_id)
+            unique_cand.append((ex_id, name))
+
+        # 2) Enrich via /exercise/<id>/ (stable)
         out: List[dict] = []
         batch_size = 10
-        for i in range(0, len(candidates), batch_size):
-            batch = candidates[i:i+batch_size]
+        for i in range(0, len(unique_cand), batch_size):
+            batch = unique_cand[i : i + batch_size]
             details = await asyncio.gather(
                 *(_fetch_exercise_detail(client, ex_id) for ex_id, _ in batch),
-                return_exceptions=True
+                return_exceptions=True,
             )
             for (ex_id, name), detail in zip(batch, details):
-                if isinstance(detail, Exception):
+                if isinstance(detail, Exception) or not isinstance(detail, dict):
                     detail = {}
-
-                # NEW: name-token guard (strict)
-                nlow = name.lower()
-                strict = all(t in nlow for t in tokens) if tokens else True
-                if not strict:
-                    continue
 
                 primary_ids = detail.get("muscles") or []
                 secondary_ids = detail.get("muscles_secondary") or []
@@ -116,25 +217,27 @@ async def search_wger(query: str, limit: int = 20) -> List[dict]:
                     "secondary": [mm[i] for i in secondary_ids if i in mm],
                 }
                 cat = category_for(name)
-                out.append({
-                    "source": "wger",
-                    "source_ref": str(ex_id),
-                    "name": name,
-                    "category": cat,
-                    "equipment": None,
-                    "default_unit": "kg" if cat == "strength" else "min",
-                    "muscles": muscles,
-                })
+                out.append(
+                    {
+                        "source": "wger",
+                        "source_ref": str(ex_id),
+                        "name": name,
+                        "category": cat,
+                        "equipment": None,
+                        "default_unit": "kg" if cat == "strength" else "min",
+                        "muscles": muscles,
+                    }
+                )
+            if len(out) >= soft_cap:
+                break
 
-        # optional: keep your scorer to rank
-        if tokens:
-            out.sort(key=lambda e: _score_name(e["name"], tokens), reverse=True)
-        else:
-            out.sort(key=lambda e: e["name"].lower())
-
+        # 3) Rank and cap
+        out.sort(key=lambda e: _score_name(e["name"], q_tokens), reverse=True)
         return out[:limit]
 
-
+# -----------------------------
+# Public: Browse (unchanged behavior, minor hygiene)
+# -----------------------------
 async def browse_wger(limit: int = 20, offset: int = 0, muscle: str | None = None) -> List[dict]:
     """
     Browse English exercise names with pagination. Optional 'muscle' filters by
