@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Exercises · Fitness Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=dev1" />
 </head>
 <body>
   <header class="site-header">
@@ -72,16 +72,6 @@
     <div id="browse-results" style="margin-top:8px"></div>
   </div>
 </div>
-
-    <style>
-      .tabs { display:flex; gap:6px; margin:6px 0 10px; }
-      .tab { padding:6px 10px; border-radius:8px; border:1px solid var(--line,#334); background:#111; cursor:pointer; }
-      .tab.active { background:#1c2430; border-color:#2c9fed; }
-      .pane { display:none; }
-      .pane.active { display:block; }
-      .spinner { display:inline-block; width:16px; height:16px; border:2px solid #999; border-top-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:6px; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
     <section class="card" style="margin-top:12px">
       <div class="row">
         <div style="grid-column:span 6" class="form-item"><label>Search</label><input id="ex-q" placeholder="filter…"></div>
