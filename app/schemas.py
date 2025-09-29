@@ -104,12 +104,16 @@ class SessionItemCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class SessionItemRead(SessionItemCreate):
+class SessionItemRead(BaseModel):
     id: int
     session_id: int
-    created_at: datetime
-    updated_at: datetime
-
+    exercise_id: int
+    notes: Optional[str]
+    order_index: Optional[int]
+    exercise_name: str
+    exercise_category: Optional[str]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 # ---------- Strength Sets ----------
 class SessionSetCreate(BaseModel):

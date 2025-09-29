@@ -7,67 +7,133 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <header class="site-header">
-    <nav class="wrap nav">
-      <a href="/" style="font-weight:800">Fitness Tracker</a>
-      <span style="flex:1"></span>
-      <a href="/exercises" class="badge">Exercises</a>
-      <a href="/workouts" class="badge">Workouts</a>
-      <a href="/sessions" class="badge">Sessions</a>
-    </nav>
-  </header>
+<header class="site-header">
+  <nav class="wrap nav">
+    <a href="/" style="font-weight:800">Fitness Tracker</a>
+    <span style="flex:1"></span>
+    <a href="/exercises" class="badge">Exercises</a>
+    <a href="/workouts" class="badge">Workouts</a>
+    <a href="/sessions" class="badge">Sessions</a>
+  </nav>
+</header>
 
-  <main class="wrap">
-    <h1>Sessions</h1>
+<main class="wrap">
+  <h1>Sessions</h1>
 
-    <section class="card fade-in" style="margin-top:12px">
-      <div class="row">
-        <div style="grid-column:span 3"><label>Date</label><input id="s-date" type="date"></div>
-        <div style="grid-column:span 5"><label>Title</label><input id="s-title"></div>
-        <div style="grid-column:span 3"><label>Notes</label><input id="s-notes"></div>
-        <div style="grid-column:span 1"><button id="btn-create-session" class="primary">Create</button></div>
+  <div class="grid" style="margin-top:12px">
+    <!-- Left: create + list -->
+    <section class="card">
+      <h3>Start a session</h3>
+
+      <div class="row" style="gap:8px; align-items:end">
+        <div class="form-item" style="grid-column: span 12">
+          <label>Workout template (optional)</label>
+          <select id="sess-template"></select>
+        </div>
+        <div class="form-item" style="grid-column: span 6">
+          <label>Date</label>
+          <input id="sess-date" type="date" />
+        </div>
+        <div class="form-item" style="grid-column: span 6">
+          <label>Title (optional)</label>
+          <input id="sess-title-input" placeholder="e.g. Push A — Mon" />
+        </div>
+        <div class="form-item" style="grid-column: span 12">
+          <label>Notes (optional)</label>
+          <input id="sess-notes" placeholder="Anything noteworthy…" />
+        </div>
+        <div class="form-item" style="grid-column: span 12">
+          <!-- ID must be sess-create for the JS -->
+          <button id="sess-create" class="primary" type="button">Start session</button>
+        </div>
       </div>
-    </section>
 
-    <section class="card" style="margin-top:12px">
-      <h3>Create from workout template</h3>
-      <div class="row">
-        <div style="grid-column:span 6"><label>Template</label><select id="s-template"></select></div>
-        <div style="grid-column:span 3"><label>Date</label><input id="st-date" type="date"></div>
-        <div style="grid-column:span 2"><label>Title (optional)</label><input id="st-title"></div>
-        <div style="grid-column:span 1; align-self:end"><button id="btn-create-from-template" class="primary">Create</button></div>
+      <div class="form-item" style="margin-top:6px">
+        <label>Filter by date (optional)</label>
+        <input id="sess-filter-date" type="date" />
       </div>
+
+      <div id="sess-list" class="list" style="margin-top:8px"></div>
     </section>
 
-    <section class="card" style="margin-top:12px">
-      <div class="row">
-        <div style="grid-column:span 6"><label>Pick a session</label><select id="s-select"></select></div>
-        <div style="grid-column:span 2"><button id="btn-refresh-sessions">Refresh</button></div>
+    <!-- Right: editor -->
+<section class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+    <h3 id="sess-title">No session selected</h3>
+    <button id="sess-delete" class="btn-small danger" style="display:none">Delete session</button>
+  </div>
+  
+  <div id="sess-empty" class="muted" style="margin:6px 0 12px">
+    Pick or start a session to view its items.
+  </div>
+
+  <div id="sess-editor" style="display:none">
+    <!-- ad-hoc add (same as you had) -->
+    <div class="row" style="gap:8px; align-items:end">
+      <div class="form-item" style="grid-column: span 8">
+        <label>Add exercise</label>
+        <select id="add-ex-select"><option value="">Loading…</option></select>
       </div>
-    </section>
-
-    <section class="card" style="margin-top:12px">
-      <h3>Add exercise to session</h3>
-      <div class="row">
-        <div style="grid-column:span 6"><label>Exercise</label><select id="si-exercise"></select></div>
-        <div style="grid-column:span 5"><label>Notes</label><input id="si-notes"></div>
-        <div style="grid-column:span 1"><label>Order</label><input id="si-order" type="number"></div>
-        <div style="grid-column:span 12; text-align:right; margin-top:8px"><button id="btn-add-item" class="primary">Add</button></div>
+      <div class="form-item" style="grid-column: span 4">
+        <label>Notes</label>
+        <input id="add-ex-notes" placeholder="optional" />
       </div>
-    </section>
-
-    <section class="card" style="margin-top:12px">
-      <table id="items-table"><thead><tr><th>ID</th><th>Order</th><th>Exercise</th><th>Notes</th></tr></thead><tbody></tbody></table>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
-      <small style="color:#9aa4b2">© Fitness Tracker</small>
-      <small style="color:#9aa4b2">Sofia Gonzalez DevOps Project</small>
+      <div class="form-item" style="grid-column: span 12">
+        <button id="add-item" class="primary" type="button">Add to session</button>
+      </div>
     </div>
-  </footer>
 
-  <script src="/static/sessions.js" defer></script>
+    <!-- Items table — same vibe as Workouts -->
+    <table id="sess-items-table" class="tight" style="margin-top:10px">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Exercise</th>
+          <th>Planned</th>
+          <th>Actual</th>
+          <th style="width:150px" class="right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="sess-items-tb"></tbody>
+    </table>
+
+    <!-- Muscle map (copied from Workouts so it looks identical) -->
+    <div style="margin-top:14px">
+      <h4>Muscle map</h4>
+      <div class="legend" style="margin-bottom:6px">
+        <span class="dot primary" style="background:#f43f5e"></span><small>Primary</small>
+        <span class="dot secondary" style="background:#f59e0b"></span><small>Secondary</small>
+      </div>
+      <div class="map-wrap">
+        <div class="bodyimg front">
+          <span class="tag">Front</span>
+          <img id="body-front" src="/static/img/body-front.png" alt="Body Front">
+          <canvas id="front-canvas"></canvas>
+        </div>
+        <div class="bodyimg back">
+          <span class="tag">Back</span>
+          <img id="body-back" src="/static/img/body-back.png" alt="Body Back">
+          <canvas id="back-canvas"></canvas>
+        </div>
+        <div>
+          <div class="chips" id="chips-primary"></div>
+          <div class="chips" id="chips-secondary" style="margin-top:6px"></div>
+          <small class="muted" id="map-note" style="display:block; margin-top:8px"></small>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
+    <small style="color:#9aa4b2">© Fitness Tracker</small>
+    <small style="color:#9aa4b2">Sofia Gonzalez DevOps Project</small>
+  </div>
+</footer>
+<script src="/static/heatmap.js?v=1"></script>
+<script src="/static/sessions.js?v=dev3"></script>
 </body>
 </html>
