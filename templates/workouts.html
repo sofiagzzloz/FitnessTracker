@@ -4,27 +4,7 @@
   <meta charset="utf-8" />
   <title>Workouts · Fitness Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/styles.css" />
-  <style>
-    .grid { display:grid; grid-template-columns: 320px 1fr; gap:16px; }
-    .list { max-height: 60vh; overflow:auto; }
-    .wo-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); }
-    .wo-item:last-child { border-bottom:none; }
-    .bodymap { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
-    .legend { display:flex; gap:10px; align-items:center; }
-    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
-    .dot.primary { background:#2cc1ff; }
-    .dot.secondary { background:#77d7ff; }
-    .chips { display:flex; gap:6px; flex-wrap:wrap; }
-    .chip { font-size:12px; padding:3px 8px; border-radius:999px; background:#13202a; border:1px solid #1f2e3a; }
-    .svgwrap { width:260px; height:auto; }
-    .svgwrap svg { width:100%; height:auto; display:block; }
-    .muted { color:#9aa4b2; }
-    .tight td { padding:6px 8px; }
-    .tight th { padding:6px 8px; }
-    .btn-small { padding:6px 10px; }
-    .danger { background:#3a0f12; border-color:#662126; }
-  </style>
+  <link rel="stylesheet" href="/static/styles.css?v=dev6">
 </head>
 <body>
 <header class="site-header">
@@ -108,35 +88,33 @@
         </table>
 
         <!-- Muscle map -->
-        <div style="margin-top:14px">
+        <div class="map-card">
           <h4>Muscle map</h4>
-          <div class="legend" style="margin-bottom:6px">
+          <div class="legend">
             <span class="dot primary"></span><small>Primary</small>
             <span class="dot secondary"></span><small>Secondary</small>
           </div>
         
-          
-          <div class="svgwrap">
-            <!-- FRONT AND BACK-->
-            <div class="body" title="Front">
-              <div class="bodymap">
-                <div class="svgwrap">
-                  <img id="body-front" src="/static/img/body-front.png" alt="Body Front" />
-                  <img id="body-back" src="/static/img/body-back.png" alt="Body Back" style="margin-top:20px" />
-                  <!-- hotspots will be drawn on top with absolute positioning -->
-                  <div id="muscle-hotspots"></div>
-                </div>
-              </div>
+          <div class="map-wrap">
+            <div class="bodyimg front">
+              <span class="tag">Front</span>
+              <img id="body-front" src="/static/img/body-front.png" alt="Body Front" />
+              <canvas id="front-canvas"></canvas>
             </div>
-          
-            <div>
+        
+            <div class="bodyimg back">
+              <span class="tag">Back</span>
+              <img id="body-back" src="/static/img/body-back.png" alt="Body Back" />
+              <canvas id="back-canvas"></canvas>
+            </div>
+        
+            <div class="map-meta">
               <div class="chips" id="chips-primary"></div>
-              <div class="chips" id="chips-secondary" style="margin-top:6px"></div>
-              <small class="muted" id="map-note" style="display:block; margin-top:8px">
-                Add items to see muscles.
-              </small>
+              <div class="chips" id="chips-secondary"></div>
+              <small class="muted" id="map-note">Add items to see muscles.</small>
             </div>
           </div>
+        </div>
     </section>
   </div>
 </main>
@@ -144,10 +122,10 @@
 <footer class="site-footer">
   <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
     <small style="color:#9aa4b2">© Fitness Tracker</small>
-    <small style="color:#9aa4b2">Built for your CS/AI course</small>
+    <small style="color:#9aa4b2">Sofia Gonzalez DevOps Project</small>
   </div>
 </footer>
 
-<script src="/static/workouts.js?v=dev3"></script>
+<script src="/static/workouts.js?v=dev6"></script>
 </body>
 </html>
