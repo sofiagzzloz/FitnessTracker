@@ -140,3 +140,10 @@ class SessionCardio(SQLModel, table=True):
     distance_unit: Optional[str] = None
     avg_hr: Optional[int] = None
     avg_pace: Optional[str] = None             
+
+
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    password_hash: str
+    created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
