@@ -1,8 +1,8 @@
+# app/models.py
 from __future__ import annotations
 from typing import Optional
 import datetime as dt
 from enum import Enum
-
 from sqlmodel import SQLModel, Field
 
 
@@ -20,32 +20,39 @@ class MuscleRole(str, Enum):
 
 class SessionStatus(str, Enum):
     draft = "draft"
-    completed = "completed"   # you log after doing it
+    completed = "completed"
+
+
+# ---------- Master user ----------
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    password_hash: str
+    created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
 
 
 # ---------- Exercises & Muscles ----------
 class Exercise(SQLModel, table=True):
+    """
+    Library of movements. Now scoped by user_id.
+    """
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)   # <-- added
     name: str = Field(index=True)
     category: Category = Field(default=Category.strength)
     default_unit: Optional[str] = None
     equipment: Optional[str] = None
     source: str = Field(default="local")
     source_ref: Optional[str] = None
-    # NEW
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
 
 class Muscle(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)           # e.g., "Quadriceps"
-    slug: str = Field(index=True)           # e.g., "quads"
+    name: str = Field(index=True)
+    slug: str = Field(index=True)
 
 
 class ExerciseMuscle(SQLModel, table=True):
-    """
-    Join table: which muscles an exercise hits, and whether primary/secondary.
-    """
     exercise_id: int = Field(foreign_key="exercise.id", primary_key=True)
     muscle_id: int = Field(foreign_key="muscle.id", primary_key=True)
     role: MuscleRole = Field(default=MuscleRole.primary)
@@ -53,18 +60,21 @@ class ExerciseMuscle(SQLModel, table=True):
 
 # ---------- Workout Templates (Plans) ----------
 class WorkoutTemplate(SQLModel, table=True):
+    """
+    Blueprint you build once and reuse. Scoped by user_id.
+    """
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)   # <-- added
     name: str
     notes: Optional[str] = None
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
     updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
-    # NEW
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
 
 class WorkoutItem(SQLModel, table=True):
     """
-    An entry inside a workout template. Strength and cardio planned fields are optional.
+    Items live under a template. We don't store user_id here because
+    ownership comes via the parent template.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
     workout_template_id: int = Field(foreign_key="workouttemplate.id", index=True)
@@ -74,13 +84,13 @@ class WorkoutItem(SQLModel, table=True):
     # Planned for strength
     planned_sets: Optional[int] = None
     planned_reps: Optional[int] = None
-    planned_weight: Optional[float] = None      # kg or lb — UI should respect exercise.default_unit
+    planned_weight: Optional[float] = None
     planned_rpe: Optional[float] = None
 
     # Planned for cardio
     planned_minutes: Optional[int] = None
     planned_distance: Optional[float] = None
-    planned_distance_unit: Optional[str] = None  # "km", "mi", etc.
+    planned_distance_unit: Optional[str] = None
 
     notes: Optional[str] = None
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
@@ -89,7 +99,11 @@ class WorkoutItem(SQLModel, table=True):
 
 # ---------- Sessions (Logged / Performed) ----------
 class Session(SQLModel, table=True):
+    """
+    Actual workouts tied to a date. Scoped by user_id.
+    """
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)   # <-- added
     date: dt.date = Field(index=True)
     title: Optional[str] = None
     notes: Optional[str] = None
@@ -97,14 +111,9 @@ class Session(SQLModel, table=True):
     status: SessionStatus = Field(default=SessionStatus.completed)
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
     updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
-    # NEW
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
 
 class SessionItem(SQLModel, table=True):
-    """
-    An exercise performed inside a session, in order.
-    """
     id: Optional[int] = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="session.id", index=True)
     order_index: int = Field(default=0, index=True)
@@ -115,32 +124,19 @@ class SessionItem(SQLModel, table=True):
 
 
 class SessionSet(SQLModel, table=True):
-    """
-    Strength actuals: one row per set.
-    """
     id: Optional[int] = Field(default=None, primary_key=True)
     session_item_id: int = Field(foreign_key="sessionitem.id", index=True)
-    set_number: int = Field(default=1)          # 1-based
+    set_number: int = Field(default=1)
     reps: Optional[int] = None
-    weight: Optional[float] = None              # same unit choice as exercise.default_unit
+    weight: Optional[float] = None
     rpe: Optional[float] = None
 
 
 class SessionCardio(SQLModel, table=True):
-    """
-    Cardio actuals: one row per session item (or extend later for laps/intervals).
-    """
     id: Optional[int] = Field(default=None, primary_key=True)
     session_item_id: int = Field(foreign_key="sessionitem.id", index=True)
     minutes: Optional[int] = None
     distance: Optional[float] = None
     distance_unit: Optional[str] = None
     avg_hr: Optional[int] = None
-    avg_pace: Optional[str] = None             
-
-
-class User(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    email: str = Field(index=True, unique=True)
-    password_hash: str
-    created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    avg_pace: Optional[str] = None

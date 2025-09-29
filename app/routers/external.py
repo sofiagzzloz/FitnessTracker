@@ -1,4 +1,6 @@
+# app/routers/external.py
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlmodel import Session as DBSession, select
 import httpx
 
@@ -31,12 +33,10 @@ MUSCLES = [
     {"slug": "abs",          "label": "Abs / Core"},
 ]
 
-
 @router.get("/muscles")
 def list_muscles():
     """Return the list of valid muscle slugs for filtering/badges in the UI."""
     return MUSCLES
-
 
 @router.get("/exercises/browse")
 async def external_browse(
@@ -51,7 +51,6 @@ async def external_browse(
     Browse WGER exercises (enriched) with optional muscle filtering.
     'muscle' must be one of the slugs from /api/external/muscles.
     """
-    # Validate muscle slug early so the UI gets a clear 400 if it sends 'delts' by mistake.
     valid_slugs = {m["slug"] for m in MUSCLES}
     if muscle is not None and muscle not in valid_slugs:
         raise HTTPException(
@@ -66,10 +65,8 @@ async def external_browse(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Adapter error: {type(e).__name__}: {e}")
 
-    # Also return next_offset to help the UI paginate (simple client-side paging helper)
     next_offset = offset + limit if len(items) == limit else None
     return {"items": items, "limit": limit, "offset": offset, "next_offset": next_offset}
-
 
 @router.get("/exercises")
 async def external_search(
@@ -83,15 +80,16 @@ async def external_search(
         results = await search_wger(q, limit=limit)
         return results
     except httpx.HTTPError as e:
-        # Network/HTTP problems to WGER
         raise HTTPException(status_code=502, detail=f"WGER HTTP error: {e!s}")
     except Exception as e:
-        # Any other bug (parsing, KeyError, etc.)
         raise HTTPException(status_code=500, detail=f"Adapter error: {type(e).__name__}: {e}")
 
-
 @router.post("/exercises/import", response_model=ExerciseRead, status_code=201)
-def import_exercise(payload: dict, session: DBSession = Depends(get_session)):
+def import_exercise(
+    payload: dict,
+    session: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """
     Accept a normalized object like:
     {
@@ -99,26 +97,39 @@ def import_exercise(payload: dict, session: DBSession = Depends(get_session)):
       "category":"strength","default_unit":"kg","equipment":null,
       "muscles":{"primary":["quads"], "secondary":["glutes","hams"]}
     }
+    Creates the exercise for the CURRENT USER only, and de-dupes per user.
     """
     name = " ".join((payload.get("name") or "").split())
     if not name:
         raise HTTPException(status_code=400, detail="name required")
 
-    # dedupe by (source, source_ref) or by name
-    src = payload.get("source") or "wger"
-    src_ref = payload.get("source_ref") or None
+    src = (payload.get("source") or "wger").strip().lower()
+    src_ref = (str(payload.get("source_ref")).strip() or None)
+
+    # ----- De-dupe PER USER -----
+    # 1) Prefer (source, source_ref, user_id)
     if src_ref:
         dup = session.exec(
-            select(Exercise).where(Exercise.source == src, Exercise.source_ref == str(src_ref))
+            select(Exercise).where(
+                Exercise.user_id == user.id,
+                Exercise.source == src,
+                Exercise.source_ref == src_ref,
+            )
         ).first()
         if dup:
             return dup
 
-    dup2 = session.exec(select(Exercise).where(Exercise.name == name)).first()
+    # 2) Fallback: name (case-insensitive) per user
+    dup2 = session.exec(
+        select(Exercise).where(
+            Exercise.user_id == user.id,
+            func.lower(Exercise.name) == name.lower(),
+        )
+    ).first()
     if dup2:
         return dup2
 
-    # ensure muscles exist
+    # ----- Ensure muscles exist (global table, no user scoping) -----
     muscles = payload.get("muscles") or {}
     slugs = set((muscles.get("primary") or []) + (muscles.get("secondary") or []))
     existing = {m.slug: m for m in session.exec(select(Muscle)).all()}
@@ -130,27 +141,28 @@ def import_exercise(payload: dict, session: DBSession = Depends(get_session)):
             session.refresh(m)
             existing[slug] = m
 
-    # category validation with friendly error if invalid enum value
+    # ----- Category enum validation -----
     raw_cat = (payload.get("category") or "strength")
     try:
         cat = Category(raw_cat)
     except Exception:
         raise HTTPException(status_code=400, detail=f"Invalid category '{raw_cat}'")
 
-    # create exercise
+    # ----- Create exercise FOR THIS USER -----
     ex = Exercise(
+        user_id=user.id,
         name=name,
         category=cat,
         default_unit=payload.get("default_unit"),
         equipment=payload.get("equipment"),
         source=src,
-        source_ref=str(src_ref) if src_ref else None,
+        source_ref=src_ref,
     )
     session.add(ex)
     session.commit()
     session.refresh(ex)
 
-    # link muscles
+    # ----- Link muscles to this exercise -----
     for slug in (muscles.get("primary") or []):
         m = existing.get(slug)
         if m:
@@ -160,8 +172,8 @@ def import_exercise(payload: dict, session: DBSession = Depends(get_session)):
         if m:
             session.add(ExerciseMuscle(exercise_id=ex.id, muscle_id=m.id, role="secondary"))  # type: ignore
     session.commit()
-    return ex
 
+    return ex
 
 @router.get("/ping")
 def ping():
