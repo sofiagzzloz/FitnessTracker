@@ -4,7 +4,10 @@ from sqlmodel import Session as DBSession, select
 
 from ..db import get_session
 from ..models import User
-from ..auth import hash_pw, verify_pw, make_token, get_current_user
+from ..auth import (
+    hash_pw, verify_pw, make_token,
+    get_current_user, set_session_cookie, clear_session_cookie,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -21,30 +24,40 @@ class MeOut(BaseModel):
     email: EmailStr
 
 @router.post("/register", response_model=MeOut, status_code=201)
-def register(payload: RegisterIn, db: DBSession = Depends(get_session)):
-    # unique email
-    exists = db.exec(select(User).where(User.email == payload.email.lower())).first()
+def register(payload: RegisterIn, response: Response, db: DBSession = Depends(get_session)):
+    email = payload.email.lower().strip()
+
+    exists = db.exec(select(User).where(User.email == email)).first()
     if exists:
         raise HTTPException(status_code=409, detail="Email already registered")
-    u = User(email=payload.email.lower(), password_hash=hash_pw(payload.password))
-    db.add(u); db.commit(); db.refresh(u)
+
+    u = User(email=email, password_hash=hash_pw(payload.password))
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+
+    # optional: auto-login on register
+    token = make_token(u.id)
+    set_session_cookie(response, token)
+
     return MeOut(id=u.id, email=u.email)
 
 @router.post("/login", response_model=MeOut)
 def login(payload: LoginIn, response: Response, db: DBSession = Depends(get_session)):
-    u = db.exec(select(User).where(User.email == payload.email.lower())).first()
+    email = payload.email.lower().strip()
+
+    u = db.exec(select(User).where(User.email == email)).first()
     if not u or not verify_pw(payload.password, u.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
     token = make_token(u.id)
-    # HttpOnly cookie
-    response.set_cookie(
-        "access_token", token, httponly=True, secure=False, samesite="lax", max_age=60*60*12, path="/"
-    )
+    set_session_cookie(response, token)
+
     return MeOut(id=u.id, email=u.email)
 
 @router.post("/logout", status_code=204)
 def logout(response: Response):
-    response.delete_cookie("access_token", path="/")
+    clear_session_cookie(response)
     return Response(status_code=204)
 
 @router.get("/me", response_model=MeOut)

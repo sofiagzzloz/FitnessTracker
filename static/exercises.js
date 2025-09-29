@@ -315,15 +315,18 @@ async function fetchLocalExercises() {
   const res = await apiFetch(`/api/exercises?${params.toString()}`);
   if (!res.ok) return;
   const rows = await res.json();
+
+  // ensure stable order
+  rows.sort((a, b) => a.id - b.id);
   renderLocalExercises(rows);
 }
 
 function renderLocalExercises(rows) {
   const tbody = document.querySelector("#ex-table tbody");
   if (!tbody) return;
-  tbody.innerHTML = rows.map(r => `
+  tbody.innerHTML = rows.map((r, i) => `
     <tr data-id="${r.id}">
-      <td>${r.id}</td>
+      <td>${i + 1}</td>
       <td>${r.name}</td>
       <td>${r.category ? `<span class="badge">${r.category}</span>` : ""}</td>
       <td>${r.default_unit || ""}</td>
