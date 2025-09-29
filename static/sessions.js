@@ -1,4 +1,17 @@
-
+// ---------- cookie-aware fetch ----------
+async function apiFetch(url, opts = {}) {
+  const merged = {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
+  };
+  const res = await fetch(url, merged);
+  if (res.status === 401 && !url.startsWith("/api/auth")) {
+    location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
 
 // -------- tiny dom helpers --------
 function el(id){ return document.getElementById(id); }
@@ -15,78 +28,74 @@ function h(tag, attrs={}, ...kids){
 
 // -------- state --------
 const state = {
-  workouts: [],          // templates
-  sessions: [],          // left list
-  selectedId: null,      // current session
-  sessionMap: new Map(), // id -> session
-  items: [],             // session items
-  exercises: [],         // for ad-hoc add
-  plannedByExId: new Map(), // ex_id -> {planned_sets, planned_reps, planned_weight}
+  workouts: [],
+  sessions: [],
+  selectedId: null,
+  sessionMap: new Map(),
+  items: [],
+  exercises: [],
+  plannedByExId: new Map(),
 };
 
 // -------- API --------
 async function apiListWorkouts(q){
-  const res = await fetch('/api/workouts' + (q ? `?q=${encodeURIComponent(q)}` : ''));
+  const res = await apiFetch('/api/workouts' + (q ? `?q=${encodeURIComponent(q)}` : ''));
   return res.ok ? res.json() : [];
 }
+
 async function apiListExercises(){
-  const res = await fetch('/api/exercises?limit=200');
+  const res = await apiFetch('/api/exercises?limit=200');
   return res.ok ? res.json() : [];
 }
+
 async function apiListSessions(params={}){
   const qs = new URLSearchParams();
   if (params.on_date) qs.set('on_date', params.on_date);
   if (params.start_date) qs.set('start_date', params.start_date);
   if (params.end_date) qs.set('end_date', params.end_date);
-  const res = await fetch('/api/sessions' + (qs.toString() ? `?${qs}` : ''));
+  const res = await apiFetch('/api/sessions' + (qs.toString() ? `?${qs}` : ''));
   return res.ok ? res.json() : [];
 }
+
 async function apiCreateSession(payload){
-  const res = await fetch('/api/sessions', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-async function apiReadSession(id){
-  const res = await fetch(`/api/sessions/${id}`);
-  return res.ok ? res.json() : null;
-}
-async function apiListSessionItems(sessionId){
-  const res = await fetch(`/api/sessions/${sessionId}/items`);
-  return res.ok ? res.json() : [];
-}
-async function apiDeleteSessionItem(sessionId, itemId){
-  const res = await fetch(`/api/sessions/${sessionId}/items/${itemId}`, { method:'DELETE' });
-  if (!res.ok) throw new Error(await res.text());
-}
-async function apiAddSessionItem(sessionId, payload){
-  const res = await fetch(`/api/sessions/${sessionId}/items`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-// OPTIONAL: only works if you add the tiny PATCH route shown below
-async function apiPatchSessionItem(sessionId, itemId, patch){
-  const res = await fetch(`/api/sessions/${sessionId}/items/${itemId}`, {
-    method:'PATCH', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(patch)
-  });
+  const res = await apiFetch('/api/sessions', { method:'POST', body: JSON.stringify(payload) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-// workouts items – to get PLANNED columns for a template
-async function apiListWorkoutItems(workoutId){
-  const res = await fetch(`/api/workouts/${workoutId}/items`);
+async function apiReadSession(id){
+  const res = await apiFetch(`/api/sessions/${id}`);
+  return res.ok ? res.json() : null;
+}
+
+async function apiListSessionItems(sessionId){
+  const res = await apiFetch(`/api/sessions/${sessionId}/items`);
   return res.ok ? res.json() : [];
 }
-// workouts muscle summary – to draw the same body map
+
+async function apiDeleteSessionItem(sessionId, itemId){
+  const res = await apiFetch(`/api/sessions/${sessionId}/items/${itemId}`, { method:'DELETE' });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function apiAddSessionItem(sessionId, payload){
+  const res = await apiFetch(`/api/sessions/${sessionId}/items`, { method:'POST', body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiPatchSessionItem(sessionId, itemId, patch){
+  const res = await apiFetch(`/api/sessions/${sessionId}/items/${itemId}`, { method:'PATCH', body: JSON.stringify(patch) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiListWorkoutItems(workoutId){
+  const res = await apiFetch(`/api/workouts/${workoutId}/items`);
+  return res.ok ? res.json() : [];
+}
 async function apiWorkoutMuscles(workoutId){
-  const res = await fetch(`/api/workouts/${workoutId}/muscles`);
+  const res = await apiFetch(`/api/workouts/${workoutId}/muscles`);
   return res.ok ? res.json() : {primary:{},secondary:{}};
 }
 

@@ -14,7 +14,10 @@
     <a href="/exercises" class="badge">Exercises</a>
     <a href="/workouts" class="badge">Workouts</a>
     <a href="/sessions" class="badge">Sessions</a>
-    <a href="/logout" class="badge">Sign out</a>
+    {% if user %}
+      <span class="badge" style="opacity:.7">{{ user.email }}</span>
+      <a href="/logout" class="badge">Sign out</a>
+    {% endif %}
   </nav>
 </header>
 

@@ -1,3 +1,18 @@
+// ---------- cookie-aware fetch ----------
+async function apiFetch(url, opts = {}) {
+  const merged = {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
+  };
+  const res = await fetch(url, merged);
+  if (res.status === 401 && !url.startsWith("/api/auth")) {
+    location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
+
 function el(id) { return document.getElementById(id); }
 
 // --- small helpers ---
@@ -13,14 +28,14 @@ function debounce(fn, ms = 200) {
 function norm(s) {
   if (!s) return "";
   return s
-    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "") // strip accents
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^\w\s]+/g, " ") // drop punctuation
+    .replace(/[^\w\s]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-// Naive singularization to mirror backend ('presses'->'press', 'squats'->'squat')
+// Naive singularization
 function _singular(t) {
   if (t.length > 3 && /[^aeiou]es$/.test(t)) return t.slice(0, -2);
   if (t.length > 3 && t.endsWith("s")) return t.slice(0, -1);
@@ -32,7 +47,7 @@ function tokens(s) {
   return norm(s).split(" ").filter(Boolean).map(_singular);
 }
 
-// Strict token-AND check (mirror backend)
+// Strict token-AND check
 function passAllTokens(name, q) {
   const n = norm(name);
   const qt = tokens(q);
@@ -53,9 +68,8 @@ const _aborters = { search: null, browse: null };
 // Add local exercise
 // -----------------------------------------------------
 async function createExercise(payload) {
-  const res = await fetch("/api/exercises", {
+  const res = await apiFetch("/api/exercises", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -140,17 +154,16 @@ document.addEventListener("click", (ev) => {
 });
 
 // -----------------------------------------------------
-// External search (NAME ONLY) — show API results as-is
+// External search (NAME ONLY)
 // -----------------------------------------------------
 async function searchExternal(q) {
-  // Use normalized+singularized tokens as cache key so 'squats' & 'squat' share cache
   const key = tokens(q).join(" ");
   if (_cache.search.has(key)) return _cache.search.get(key);
 
   if (_aborters.search) _aborters.search.abort();
   _aborters.search = new AbortController();
 
-  const res = await fetch(
+  const res = await apiFetch(
     `/api/external/exercises?q=${encodeURIComponent(q)}&limit=20`,
     { signal: _aborters.search.signal }
   );
@@ -168,7 +181,6 @@ function renderExternalResults(list, q) {
   if (!out) return;
   out.innerHTML = "";
 
-  // Mirror backend: strict AND of normalized/singularized tokens
   const filtered = Array.isArray(list)
     ? (tokens(q).length ? list.filter(it => passAllTokens(it.name || "", q)) : list)
     : [];
@@ -250,12 +262,12 @@ function attachExploreHandlers() {
 // Delete one local exercise
 // -----------------------------------------------------
 async function deleteExercise(id) {
-  const res = await fetch(`/api/exercises/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`/api/exercises/${id}`, { method: "DELETE" });
   if (res.status === 204) return { status: "deleted" };
 
   if (res.status === 409) {
     try {
-      const usageRes = await fetch(`/api/exercises/${id}/usage`);
+      const usageRes = await apiFetch(`/api/exercises/${id}/usage`);
       if (usageRes.ok) {
         const usage = await usageRes.json();
         return { status: "in_use", usage };
@@ -277,9 +289,8 @@ async function deleteExercise(id) {
 // Import from external
 // -----------------------------------------------------
 async function importExternal(obj) {
-  const res = await fetch("/api/external/exercises/import", {
+  const res = await apiFetch("/api/external/exercises/import", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(obj),
   });
   if (!res.ok) {
@@ -301,7 +312,7 @@ async function fetchLocalExercises() {
   if (cat) params.set("category", cat);
   params.set("limit", "100");
 
-  const res = await fetch(`/api/exercises?${params.toString()}`);
+  const res = await apiFetch(`/api/exercises?${params.toString()}`);
   if (!res.ok) return;
   const rows = await res.json();
   renderLocalExercises(rows);
@@ -334,7 +345,7 @@ function wireLocalFilters() {
 // -----------------------------------------------------
 async function fetchMuscles() {
   try {
-    const res = await fetch("/api/external/muscles");
+    const res = await apiFetch("/api/external/muscles");
     const list = await res.json();
     const sel = el("browse-muscle");
     if (sel && Array.isArray(list)) {
@@ -360,7 +371,9 @@ async function browseExternalFetch({ muscle, limit, offset }) {
   params.set("limit", String(limit));
   params.set("offset", String(offset));
 
-  const res = await fetch(`/api/external/exercises/browse?${params.toString()}`, { signal: _aborters.browse.signal });
+  const res = await apiFetch(`/api/external/exercises/browse?${params.toString()}`, {
+    signal: _aborters.browse.signal
+  });
   if (!res.ok) throw new Error(`Browse failed ${res.status}`);
   const data = await res.json();
   const items = data && data.items ? data.items : [];
