@@ -66,10 +66,13 @@ def logout():
     return resp
 
 # ---------- Protected pages (require login) ----------
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request, user: User = Depends(get_current_user)):
-    # you can also pass "user" into the template if you want to show email / logout link
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+
+@app.get("/", include_in_schema=False)
+def root_redirect(request: Request):
+    # If they have a session, send them to /workouts; otherwise to /login
+    if request.cookies.get("session"):
+        return RedirectResponse("/workouts", status_code=302)
+    return RedirectResponse("/login", status_code=302)
 
 @app.get("/exercises", response_class=HTMLResponse)
 def exercises_page(request: Request, user: User = Depends(get_current_user)):

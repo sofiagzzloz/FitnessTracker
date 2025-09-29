@@ -1,3 +1,18 @@
+async function apiFetch(url, opts = {}) {
+  const merged = {
+    credentials: "include",                       
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
+  };
+  const res = await fetch(url, merged);
+  // You can choose to auto-redirect on 401 here if you like:
+  if (res.status === 401 && !url.startsWith("/api/auth")) {
+    location.href = "/login";
+    return Promise.reject(new Error("Unauthorized"));
+  }
+  return res;
+}
+
 // ========== tiny DOM helpers ==========
 function el(id) { return document.getElementById(id); }
 function h(tag, attrs = {}, ...kids) {
@@ -62,60 +77,68 @@ function setPlannerForCardio(on) {
 }
 // ========== API helpers ==========
 async function apiListWorkouts(q) {
-  const res = await fetch("/api/workouts" + (q ? `?q=${encodeURIComponent(q)}` : ""));
+  const res = await apiFetch("/api/workouts" + (q ? `?q=${encodeURIComponent(q)}` : ""));
   return res.ok ? res.json() : [];
 }
+
 async function apiCreateWorkout(name) {
-  const res = await fetch("/api/workouts", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name })
+  const res = await apiFetch("/api/workouts", {
+    method: "POST",
+    body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
 async function apiDeleteWorkout(id) {
-  const res = await fetch(`/api/workouts/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`/api/workouts/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
 }
+
 async function apiListItems(tid) {
-  const res = await fetch(`/api/workouts/${tid}/items`);
+  const res = await apiFetch(`/api/workouts/${tid}/items`);
   return res.ok ? res.json() : [];
 }
+
 async function apiAddItem(tid, payload) {
-  const res = await fetch(`/api/workouts/${tid}/items`, {
+  const res = await apiFetch(`/api/workouts/${tid}/items`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
 async function apiDeleteItem(itemId) {
-  const res = await fetch(`/api/workouts/items/${itemId}`, { method: "DELETE" });
+  const res = await apiFetch(`/api/workouts/items/${itemId}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
 }
+
 async function apiListExercises() {
   const cap = 200;
-  let res = await fetch(`/api/exercises?limit=${cap}`);
+  let res = await apiFetch(`/api/exercises?limit=${cap}`);
   if (res.ok) return res.json();
+
   if (res.status === 422) {
-    res = await fetch("/api/exercises?limit=100");
+    res = await apiFetch("/api/exercises?limit=100");
     return res.ok ? res.json() : [];
   }
+
   const txt = await res.text().catch(() => "");
   console.error("[workouts] /api/exercises failed:", res.status, txt);
   return [];
 }
+
+
 async function apiTemplateMuscles(tid) {
-  const res = await fetch(`/api/workouts/${tid}/muscles`);
+  const res = await apiFetch(`/api/workouts/${tid}/muscles`);
   if (!res.ok) return { primary: {}, secondary: {} };
   return res.json();
 }
 
 async function apiPatchItem(itemId, patch) {
-  const res = await fetch(`/api/workouts/items/${itemId}`, {
+  const res = await apiFetch(`/api/workouts/items/${itemId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error(await res.text());
