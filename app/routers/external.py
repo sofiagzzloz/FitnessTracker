@@ -3,11 +3,16 @@ from sqlmodel import Session as DBSession, select
 import httpx
 
 from ..db import get_session
-from ..models import Exercise, Muscle, ExerciseMuscle, Category
+from ..auth import get_current_user
+from ..models import Exercise, Muscle, ExerciseMuscle, Category, User
 from ..services.adapters.wger import search_wger, browse_wger
 from ..schemas import ExerciseRead
 
 router = APIRouter(prefix="/api/external", tags=["external"])
+
+def ensure_owner(obj, user_id: int, what: str = "resource"):
+    if not obj or getattr(obj, "user_id", None) != user_id:
+        raise HTTPException(status_code=404, detail=f"{what} not found")
 
 # IMPORTANT: these slugs must match muscles_map_wger() in the WGER adapter
 MUSCLES = [

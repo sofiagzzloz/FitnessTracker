@@ -1,3 +1,4 @@
+# app/routers/sessions.py
 from typing import List, Optional
 import datetime as dt
 
@@ -6,13 +7,15 @@ from pydantic import BaseModel
 from sqlmodel import Session as DBSession, select, delete
 
 from ..db import get_session
+from ..auth import get_current_user
 from ..models import (
     Session,
     SessionItem,
-    SessionSet,        # <-- make sure these exist in models.py
-    SessionCardio,     # <-- make sure these exist in models.py
+    SessionSet,
+    SessionCardio,
     Exercise,
     WorkoutItem,
+    User,
 )
 from ..schemas import (
     SessionCreate,
@@ -23,7 +26,6 @@ from ..schemas import (
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
-
 # ---------- helpers ----------
 def _today() -> dt.date:
     return dt.date.today()
@@ -31,20 +33,41 @@ def _today() -> dt.date:
 def _now() -> dt.datetime:
     return dt.datetime.utcnow()
 
-def _exercise_or_400(db: DBSession, ex_id: int) -> Exercise:
+def ensure_owner(obj, user_id: int, what: str = "resource"):
+    """404 if missing or owned by someone else (only enforces if model has user_id)."""
+    if not obj:
+        raise HTTPException(status_code=404, detail=f"{what} not found")
+    if hasattr(obj, "user_id") and getattr(obj, "user_id") != user_id:
+        raise HTTPException(status_code=404, detail=f"{what} not found")
+
+def add_owner_filter(stmt, model, user_id: int):
+    """If model has user_id, add WHERE user_id=:user_id."""
+    if hasattr(model, "user_id"):
+        return stmt.where(getattr(model, "user_id") == user_id)
+    return stmt
+
+def _exercise_or_400(db: DBSession, ex_id: int, user: User) -> Exercise:
     ex = db.get(Exercise, ex_id)
     if not ex:
+        raise HTTPException(status_code=400, detail="Invalid exercise_id")
+    if hasattr(Exercise, "user_id") and ex.user_id != user.id:
+        # hide existence
         raise HTTPException(status_code=400, detail="Invalid exercise_id")
     return ex
 
 
 # ---------- create session (optionally from a workout template) ----------
 @router.post("", response_model=SessionRead, status_code=201)
-def create_session(payload: SessionCreate, db: DBSession = Depends(get_session)):
+def create_session(
+    payload: SessionCreate,
+    db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     if payload.date > _today():
         raise HTTPException(status_code=422, detail="You can only log sessions for today or earlier.")
 
-    s = Session(
+    # create session (attach user_id if column exists)
+    s_kwargs = dict(
         date=payload.date,
         title=(payload.title or None),
         notes=(payload.notes or None),
@@ -52,13 +75,19 @@ def create_session(payload: SessionCreate, db: DBSession = Depends(get_session))
         created_at=_now(),
         updated_at=_now(),
     )
+    if hasattr(Session, "user_id"):
+        s_kwargs["user_id"] = user.id
+
+    s = Session(**s_kwargs)
     db.add(s)
     db.commit()
     db.refresh(s)
 
+    # clone items from a workout template if provided (and owned)
     tpl_id = payload.workout_template_id
     if tpl_id:
-        # Try the common FK names gracefully
+        # If WorkoutTemplate has user_id, enforce ownership via Session.workout_template_id parent
+        # We don't need to load the template model here; we copy WorkoutItem rows by FK.
         fk_col = (
             getattr(WorkoutItem, "workout_id", None)
             or getattr(WorkoutItem, "workout_template_id", None)
@@ -74,9 +103,11 @@ def create_session(payload: SessionCreate, db: DBSession = Depends(get_session))
             or getattr(WorkoutItem, "id", None)
         )
 
-        tpl_items = db.exec(
-            select(WorkoutItem).where(fk_col == tpl_id).order_by(order_col.asc())
-        ).all()
+        tpl_items_stmt = select(WorkoutItem).where(fk_col == tpl_id).order_by(order_col.asc())
+        # If WorkoutItem table itself is user-scoped, filter to current user
+        tpl_items_stmt = add_owner_filter(tpl_items_stmt, WorkoutItem, user.id)
+
+        tpl_items = db.exec(tpl_items_stmt).all()
 
         next_order = 1
         for it in tpl_items:
@@ -101,8 +132,10 @@ def list_sessions(
     start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="YYYY-MM-DD (inclusive)"),
     db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     stmt = select(Session)
+    stmt = add_owner_filter(stmt, Session, user.id)
     if on_date:
         d = dt.date.fromisoformat(on_date)
         stmt = stmt.where(Session.date == d)
@@ -119,24 +152,32 @@ def list_sessions(
 
 # ---------- read one ----------
 @router.get("/{session_id}", response_model=SessionRead)
-def read_session(session_id: int, db: DBSession = Depends(get_session)):
+def read_session(
+    session_id: int,
+    db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     s = db.get(Session, session_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Session not found")
+    ensure_owner(s, user.id, "session")
     return s
 
 
 # ---------- add item to a session ----------
 @router.post("/{session_id}/items", response_model=SessionItemRead, status_code=201)
-def add_item(session_id: int, payload: SessionItemCreate, db: DBSession = Depends(get_session)):
+def add_item(
+    session_id: int,
+    payload: SessionItemCreate,
+    db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     s = db.get(Session, session_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Session not found")
+    ensure_owner(s, user.id, "session")
     if s.date > _today():
         raise HTTPException(status_code=422, detail="This session is future-dated and cannot be modified.")
 
-    ex = _exercise_or_400(db, payload.exercise_id)
+    ex = _exercise_or_400(db, payload.exercise_id, user)
 
+    # determine next order
     if payload.order_index is None:
         max_orders = db.exec(
             select(SessionItem.order_index).where(SessionItem.session_id == session_id)
@@ -170,13 +211,18 @@ def add_item(session_id: int, payload: SessionItemCreate, db: DBSession = Depend
 
 # ---------- list items (table on the right) ----------
 @router.get("/{session_id}/items", response_model=List[SessionItemRead])
-def list_items(session_id: int, db: DBSession = Depends(get_session)):
+def list_items(
+    session_id: int,
+    db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     s = db.get(Session, session_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Session not found")
+    ensure_owner(s, user.id, "session")
 
     rows = db.exec(
-        select(SessionItem).where(SessionItem.session_id == session_id).order_by(SessionItem.order_index.asc())
+        select(SessionItem)
+        .where(SessionItem.session_id == session_id)
+        .order_by(SessionItem.order_index.asc())
     ).all()
 
     ex_ids = {r.exercise_id for r in rows}
@@ -202,12 +248,20 @@ class SessionItemUpdate(BaseModel):
     order_index: Optional[int] = None
 
 @router.patch("/{session_id}/items/{item_id}", response_model=SessionItemRead)
-def update_item(session_id: int, item_id: int, payload: SessionItemUpdate, db: DBSession = Depends(get_session)):
+def update_item(
+    session_id: int,
+    item_id: int,
+    payload: SessionItemUpdate,
+    db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     it = db.get(SessionItem, item_id)
     if not it or it.session_id != session_id:
         raise HTTPException(status_code=404, detail="Item not found")
 
     s = db.get(Session, session_id)
+    ensure_owner(s, user.id, "session")
+
     if s.date > _today():
         raise HTTPException(status_code=422, detail="This session is future-dated and cannot be modified.")
 
@@ -235,12 +289,20 @@ def update_item(session_id: int, item_id: int, payload: SessionItemUpdate, db: D
 
 # ---------- delete item (and its child rows) ----------
 @router.delete("/{session_id}/items/{item_id}", status_code=204)
-def delete_item(session_id: int, item_id: int, db: DBSession = Depends(get_session)):
+def delete_item(
+    session_id: int,
+    item_id: int,
+    db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     it = db.get(SessionItem, item_id)
     if not it or it.session_id != session_id:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    # delete children first if they exist
+    s = db.get(Session, session_id)
+    ensure_owner(s, user.id, "session")
+
+    # delete children first
     db.exec(delete(SessionSet).where(SessionSet.session_item_id == item_id))
     db.exec(delete(SessionCardio).where(SessionCardio.session_item_id == item_id))
 
@@ -251,25 +313,27 @@ def delete_item(session_id: int, item_id: int, db: DBSession = Depends(get_sessi
 
 # ---------- delete session (and ALL its children) ----------
 @router.delete("/{session_id}", status_code=204)
-def delete_session(session_id: int, db: DBSession = Depends(get_session)):
+def delete_session(
+    session_id: int,
+    db: DBSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     s = db.get(Session, session_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Session not found")
+    ensure_owner(s, user.id, "session")
 
-    # 1) collect child item ids (this returns ints, not objects)
+    # collect item ids once
     item_ids = db.exec(
         select(SessionItem.id).where(SessionItem.session_id == session_id)
     ).all()
 
-    # 2) delete child rows first (safer than relying on ON DELETE CASCADE)
     if item_ids:
+        # delete child detail rows first
+        db.exec(delete(SessionSet).where(SessionSet.session_item_id.in_(item_ids)))
+        db.exec(delete(SessionCardio).where(SessionCardio.session_item_id.in_(item_ids)))
+        # then delete items
         db.exec(delete(SessionItem).where(SessionItem.id.in_(item_ids)))
 
-        # If you still have SessionSet / SessionCardio tables in your DB, also:
-        # db.exec(delete(SessionSet).where(SessionSet.session_item_id.in_(item_ids)))
-        # db.exec(delete(SessionCardio).where(SessionCardio.session_item_id.in_(item_ids)))
-
-    # 3) delete the parent session
+    # finally delete the session
     db.exec(delete(Session).where(Session.id == session_id))
     db.commit()
     return None
