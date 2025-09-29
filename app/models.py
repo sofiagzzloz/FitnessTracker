@@ -25,16 +25,15 @@ class SessionStatus(str, Enum):
 
 # ---------- Exercises & Muscles ----------
 class Exercise(SQLModel, table=True):
-    """
-    Library of movements. Can be user-created or imported from an external provider.
-    """
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     category: Category = Field(default=Category.strength)
-    default_unit: Optional[str] = None      # e.g., "kg", "lb", "km", "min"
+    default_unit: Optional[str] = None
     equipment: Optional[str] = None
-    source: str = Field(default="local")    # "local" | "wger" | "exercisedb" | ...
-    source_ref: Optional[str] = None        # external id, if imported
+    source: str = Field(default="local")
+    source_ref: Optional[str] = None
+    # NEW
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
 
 class Muscle(SQLModel, table=True):
@@ -54,14 +53,13 @@ class ExerciseMuscle(SQLModel, table=True):
 
 # ---------- Workout Templates (Plans) ----------
 class WorkoutTemplate(SQLModel, table=True):
-    """
-    Blueprint you build once and reuse. Not tied to a date.
-    """
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     notes: Optional[str] = None
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
     updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    # NEW
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
 
 class WorkoutItem(SQLModel, table=True):
@@ -91,9 +89,6 @@ class WorkoutItem(SQLModel, table=True):
 
 # ---------- Sessions (Logged / Performed) ----------
 class Session(SQLModel, table=True):
-    """
-    A record of what you actually did. Must be for today or a past date (enforce in API).
-    """
     id: Optional[int] = Field(default=None, primary_key=True)
     date: dt.date = Field(index=True)
     title: Optional[str] = None
@@ -102,6 +97,8 @@ class Session(SQLModel, table=True):
     status: SessionStatus = Field(default=SessionStatus.completed)
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
     updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    # NEW
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
 
 class SessionItem(SQLModel, table=True):
