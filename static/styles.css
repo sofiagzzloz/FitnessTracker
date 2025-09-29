@@ -160,11 +160,12 @@ tbody tr:hover { background: #11141a; }
 @keyframes fade-in { from { opacity:0; transform: translateY(2px); } to { opacity:1; transform: none; } }
 
 /* ——— Muscle Map ——— */
-.map-wrap{
-  display:flex;
-  gap:20px;
-  align-items:flex-start;
-  flex-wrap:wrap;
+.map-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  flex-wrap: wrap;
 }
 
 .bodyimg{
@@ -187,21 +188,33 @@ tbody tr:hover { background: #11141a; }
   pointer-events:none;
 }
 
-/* optional glow dots (kept for now; they’ll sit ON the image) */
 .hotspot {
-  position: absolute; transform: translate(-50%,-50%);
-  border-radius: 999px; pointer-events: none;
-  background: #2cc1ff; opacity: .75;
-  box-shadow: 0 0 24px #2cc1ff80, 0 0 8px #2cc1ff80;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: .85;                 /* keep a nice glow later */
+}
+
+.hotspot.primary {
+  background:#ff3b3b !important;
+  box-shadow:0 0 24px rgba(255,59,59,.6), 0 0 8px rgba(255,59,59,.6) !important;
+  opacity:.85;
 }
 .hotspot.secondary {
-  background: #77d7ff; opacity: .65;
-  box-shadow: 0 0 18px #77d7ff80, 0 0 6px #77d7ff80;
+  background:#ffb347 !important;
+  box-shadow:0 0 18px rgba(255,179,71,.6), 0 0 6px rgba(255,179,71,.6) !important;
+  opacity:.8;
 }
+
 .lvl-1 { width:10%; height:10%; }
 .lvl-2 { width:12%; height:12%; opacity:.8; }
 .lvl-3 { width:14%; height:14%; opacity:.9; }
 .lvl-4 { width:16%; height:16%; opacity:1; }
+
+/* Legend dots */
+.dot { width:10px; height:10px; border-radius:999px; display:inline-block; }
+.dot.primary { background: #ff3b3b; }   /* vivid red */
+.dot.secondary { background: #ffb347; } /* warm orange */
+
 
 /* ——— Responsive ——— */
 @media (max-width: 900px){
