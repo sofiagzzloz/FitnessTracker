@@ -71,6 +71,16 @@ async function apiTemplateMuscles(tid) {
   return res.json();
 }
 
+async function apiPatchItem(itemId, patch) {
+  const res = await fetch(`/api/workouts/items/${itemId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // ========== UI: workouts list / items table ==========
 function renderWorkoutList() {
   const box = el("wo-list");
@@ -101,36 +111,127 @@ function renderItems() {
     tb.innerHTML = '<tr><td colspan="4" class="muted">No items yet.</td></tr>';
     return;
   }
+
+  const exMap = new Map(state.exercises.map(e => [e.id, e]));
+
   state.items.forEach((it, idx) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${idx + 1}</td>
-      <td>${it.exercise_id}</td>
-      <td>${planText(it)}</td>
-      <td class="right"><button class="btn-small danger" data-id="${it.id}">Remove</button></td>
-    `;
-    tb.appendChild(tr);
-  });
+    tr.dataset.itemId = it.id;
 
-  // resolve exercise names
-  const map = new Map(state.exercises.map(e => [e.id, e]));
-  [...tb.querySelectorAll("tr")].forEach((tr, i) => {
-    const it = state.items[i];
-    const ex = map.get(it.exercise_id);
-    if (ex) tr.children[1].textContent = ex.name;
-  });
+    const tdIdx = h("td", {}, String(idx + 1));
+    const tdEx  = h("td", {}, exMap.get(it.exercise_id)?.name || it.exercise_id);
+    const tdPln = h("td", {}, planText(it));
+    const tdAct = h("td", { class: "right" });
 
-  // wire deletes
-  tb.querySelectorAll("button[data-id]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const id = Number(btn.getAttribute("data-id"));
+    // view-mode actions: Edit + Remove
+    const editBtn = h("button", { class: "btn-small", text: "Edit" });
+    const delBtn  = h("button", { class: "btn-small danger", text: "Remove" });
+
+    editBtn.addEventListener("click", () => enterEditRow(tr, it));
+    delBtn.addEventListener("click", async () => {
       if (!confirm("Remove item?")) return;
       try {
-        await apiDeleteItem(id);
+        await apiDeleteItem(it.id);
         await refreshItems();
       } catch (e) { alert(e.message || "Delete failed"); }
     });
+
+    tdAct.appendChild(editBtn);
+    tdAct.appendChild(document.createTextNode(" "));
+    tdAct.appendChild(delBtn);
+
+    tr.appendChild(tdIdx);
+    tr.appendChild(tdEx);
+    tr.appendChild(tdPln);
+    tr.appendChild(tdAct);
+
+    tb.appendChild(tr);
   });
+}
+
+function enterEditRow(tr, it) {
+  const tdPln = tr.children[2];
+  const tdAct = tr.children[3];
+
+  // build inputs prefilled from item
+  const inSets = h("input", { type: "number", min: "0", class: "input", style: "width:80px", value: it.planned_sets ?? "" });
+  const inReps = h("input", { type: "number", min: "0", class: "input", style: "width:80px", value: it.planned_reps ?? "" });
+  const inWgt  = h("input", { type: "number", step: "0.5", class: "input", style: "width:120px", value: it.planned_weight ?? "" });
+
+  // render mini form inside the Planned cell: Sets | Reps | Weight
+  tdPln.innerHTML = "";
+  tdPln.append(
+    wrapMiniField("Sets", inSets),
+    " ",
+    wrapMiniField("Reps", inReps),
+    " ",
+    wrapMiniField("Weight", inWgt)
+  );
+
+  // actions: Save / Cancel / Remove
+  const saveBtn   = h("button", { class: "btn-small", text: "Save" });
+  const cancelBtn = h("button", { class: "btn-small", text: "Cancel" });
+  const delBtn    = h("button", { class: "btn-small danger", text: "Remove" });
+
+  tdAct.innerHTML = "";
+  tdAct.append(saveBtn, document.createTextNode(" "), cancelBtn, document.createTextNode(" "), delBtn);
+  tdAct.classList.add("right");
+
+  // Remove (same as view)
+  delBtn.addEventListener("click", async () => {
+    if (!confirm("Remove item?")) return;
+    try { await apiDeleteItem(it.id); await refreshItems(); }
+    catch (e) { alert(e.message || "Delete failed"); }
+  });
+
+  // Save → PATCH
+  saveBtn.addEventListener("click", async () => {
+    try {
+      await apiPatchItem(it.id, {
+        planned_sets:   toInt(inSets.value),
+        planned_reps:   toInt(inReps.value),
+        planned_weight: toFloat(inWgt.value),
+      });
+      await refreshItems();
+    } catch (e) {
+      alert(e.message || "Update failed");
+    }
+  });
+
+  // Cancel → go back to view mode
+  cancelBtn.addEventListener("click", () => {
+    tdPln.textContent = planText(it);
+    tdAct.innerHTML = "";
+    const editBtn = h("button", { class: "btn-small", text: "Edit" });
+    const delBtn2 = h("button", { class: "btn-small danger", text: "Remove" });
+    editBtn.addEventListener("click", () => enterEditRow(tr, it));
+    delBtn2.addEventListener("click", async () => {
+      if (!confirm("Remove item?")) return;
+      try { await apiDeleteItem(it.id); await refreshItems(); }
+      catch (e) { alert(e.message || "Delete failed"); }
+    });
+    tdAct.append(editBtn, document.createTextNode(" "), delBtn2);
+  });
+
+  // Enter saves
+  [inSets, inReps, inWgt].forEach(inp => inp.addEventListener("keydown", e => {
+    if (e.key === "Enter") saveBtn.click();
+  }));
+
+  inSets.focus();
+}
+
+// tiny UI helper to label small inputs inside the Planned cell
+function wrapMiniField(lbl, inputEl){
+  const box = document.createElement("span");
+  box.style.display = "inline-flex";
+  box.style.alignItems = "center";
+  box.style.gap = "6px";
+  const small = document.createElement("small");
+  small.className = "hint";
+  small.textContent = lbl;
+  box.append(small, inputEl);
+  return box;
 }
 
 function planText(it) {

@@ -1,5 +1,6 @@
 from datetime import date as dt_date
 from typing import List, Optional
+from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -135,18 +136,33 @@ def add_template_item(
 
     return it
 
+class WorkoutItemUpdate(BaseModel):
+    planned_sets: Optional[int] = None
+    planned_reps: Optional[int] = None
+    planned_weight: Optional[float] = None
+    planned_rpe: Optional[float] = None
+    planned_minutes: Optional[int] = None
+    planned_distance: Optional[float] = None
+    planned_distance_unit: Optional[str] = None
+    notes: Optional[str] = None
+    order_index: Optional[int] = None
+
+
+
 @router.patch("/items/{item_id}", response_model=WorkoutItemRead)
 def update_template_item(
     item_id: int,
-    payload: WorkoutItemCreate,  # PATCH uses partial via exclude_unset
+    payload: WorkoutItemUpdate,   # 👈 now uses the partial schema
     session: DBSession = Depends(get_session),
 ):
     it = session.get(WorkoutItem, item_id)
     if not it:
         raise HTTPException(status_code=404, detail="item not found")
+
     data = payload.model_dump(exclude_unset=True)
     for field, value in data.items():
         setattr(it, field, value)
+
     session.add(it)
     session.commit()
     session.refresh(it)
