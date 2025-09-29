@@ -19,6 +19,47 @@ const state = {
   exercises: [],
 };
 
+// map exerciseId -> category for quick lookup
+const exCategoryById = new Map();
+
+// track whether current selection is cardio
+let isCardio = false;
+
+function setPlannerForCardio(on) {
+  isCardio = !!on;
+
+  // Inputs
+  const inSets   = el('item-sets');
+  const inReps   = el('item-reps');
+  const inWeight = el('item-weight');
+
+  // Labels (if you added the optional IDs)
+  const lblSets   = document.getElementById('lbl-sets');
+  const lblReps   = document.getElementById('lbl-reps');
+  const lblWeight = document.getElementById('lbl-weight');
+
+  if (on) {
+    // Cardio mode
+    lblSets   && (lblSets.textContent   = 'Minutes');
+    lblReps   && (lblReps.textContent   = 'Distance');
+    lblWeight && (lblWeight.textContent = 'Pace / HR (optional)');
+
+    inSets.type = 'number';   inSets.min = '0';  inSets.placeholder = '30';
+    inReps.type = 'number';   inReps.min = '0';  inReps.step = '0.1'; inReps.placeholder = '5 (km/mi)';
+    // use "weight" box as a free text note in cardio
+    inWeight.type = 'text';   inWeight.placeholder = 'e.g. 5:30/km or HR 150';
+
+  } else {
+    // Strength mode (original)
+    lblSets   && (lblSets.textContent   = 'Sets');
+    lblReps   && (lblReps.textContent   = 'Reps');
+    lblWeight && (lblWeight.textContent = 'Weight');
+
+    inSets.type = 'number';   inSets.min = '1';  inSets.placeholder = '3';
+    inReps.type = 'number';   inReps.min = '1';  inReps.placeholder = '10';
+    inWeight.type = 'number'; inWeight.step = '0.5'; inWeight.placeholder = 'kg/lb';
+  }
+}
 // ========== API helpers ==========
 async function apiListWorkouts(q) {
   const res = await fetch("/api/workouts" + (q ? `?q=${encodeURIComponent(q)}` : ""));
@@ -235,6 +276,18 @@ function wrapMiniField(lbl, inputEl){
 }
 
 function planText(it) {
+  // figure out the exercise category for this item
+  const cat = exCategoryById.get(it.exercise_id) || '';
+
+  if (cat === 'cardio') {
+    const mins = it.planned_sets != null ? `${it.planned_sets}m` : '';
+    const dist = it.planned_reps != null ? `${it.planned_reps}${''}` : ''; // unit free; user knows their unit
+    const pace = (it.notes && it.notes.trim()) ? ` — ${it.notes.trim()}` : '';
+    const parts = [mins, dist].filter(Boolean).join(' ');
+    return parts || pace || '—';
+  }
+
+  // strength (original)
   const parts = [];
   if (it.planned_sets) parts.push(`${it.planned_sets}x`);
   if (it.planned_reps) parts.push(`${it.planned_reps}`);
@@ -492,6 +545,13 @@ async function refreshWorkouts() {
 async function initExercisesSelect() {
   try {
     state.exercises = await apiListExercises();
+
+    // build category map
+    exCategoryById.clear();
+    state.exercises.forEach(ex => {
+      if (ex && ex.id) exCategoryById.set(ex.id, (ex.category || '').toLowerCase());
+    });
+
     const sel = el("item-ex-select");
     if (!sel) { console.warn("[workouts] missing #item-ex-select"); return; }
 
@@ -509,6 +569,14 @@ async function initExercisesSelect() {
       opt.textContent = ex.name;
       sel.appendChild(opt);
     });
+
+    // swap UI on change
+    sel.addEventListener('change', () => {
+      const id = Number(sel.value);
+      const cat = exCategoryById.get(id) || '';
+      setPlannerForCardio(cat === 'cardio');
+    });
+
   } catch (e) {
     console.error("[workouts] failed to load exercises", e);
     alert(e.message || "Could not load exercises list.");
@@ -557,24 +625,58 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // add item
-  el("item-add").addEventListener("click", async () => {
-    if (!state.selectedId) return;
-    const exId = Number(el("item-ex-select").value);
-    if (!exId) return alert("Choose an exercise");
-    const payload = {
+// add item
+el("item-add").addEventListener("click", async () => {
+  if (!state.selectedId) return;
+  const exId = Number(el("item-ex-select").value);
+  if (!exId) return alert("Choose an exercise");
+
+  const cat = exCategoryById.get(exId) || '';
+
+  // read inputs once
+  const vSets   = el('item-sets').value;
+  const vReps   = el('item-reps').value;
+  const vWeight = el('item-weight').value; // for cardio, this is "Pace/HR (optional)"
+
+  let payload;
+
+  if (cat === 'cardio') {
+    // minutes -> planned_sets (int), distance -> planned_reps (float), notes <- pace/hr text
+    const minutes  = Number.isFinite(parseInt(vSets, 10)) ? parseInt(vSets, 10) : null;
+    const distance = Number.isFinite(parseFloat(vReps))   ? parseFloat(vReps)   : null;
+    const note     = (vWeight || '').trim() || null;
+
+    payload = {
       exercise_id: exId,
-      planned_sets: toInt(el("item-sets").value),
-      planned_reps: toInt(el("item-reps").value),
-      planned_weight: toFloat(el("item-weight").value),
+      planned_sets: minutes,
+      planned_reps: distance,
+      planned_weight: null,  // keep numeric-only field empty for cardio
+      notes: note
     };
-    try {
-      await apiAddItem(state.selectedId, payload);
-      el("item-sets").value = "";
-      el("item-reps").value = "";
-      el("item-weight").value = "";
-      await refreshItems();
-    } catch (e) { alert(e.message || "Add failed"); }
-  });
+  } else {
+    // original strength behavior
+    const sets   = Number.isFinite(parseInt(vSets, 10)) ? parseInt(vSets, 10) : null;
+    const reps   = Number.isFinite(parseInt(vReps, 10)) ? parseInt(vReps, 10) : null;
+    const weight = Number.isFinite(parseFloat(vWeight)) ? parseFloat(vWeight) : null;
+
+    payload = {
+      exercise_id: exId,
+      planned_sets: sets,
+      planned_reps: reps,
+      planned_weight: weight,
+      notes: null
+    };
+  }
+
+  try {
+    await apiAddItem(state.selectedId, payload);
+    // clear fields
+    el('item-sets').value = '';
+    el('item-reps').value = '';
+    el('item-weight').value = '';
+    await refreshItems();
+  } catch (e) { alert(e.message || "Add failed"); }
+});
 
   await initExercisesSelect();
   await refreshWorkouts();
