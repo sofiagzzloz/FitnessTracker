@@ -4,49 +4,59 @@
   <meta charset="utf-8" />
   <title>Home · Fitness Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=dev9" />
 </head>
 <body>
-  <header class="site-header">
-    <nav class="wrap nav">
-      <a href="/" style="font-weight:800">Fitness Tracker</a>
-      <span style="flex:1"></span>
-      <a href="/exercises" class="badge">Exercises</a>
-      <a href="/workouts" class="badge">Workouts</a>
-      <a href="/sessions" class="badge">Sessions</a>
-    </nav>
-  </header>
+<header class="site-header">
+  <nav class="wrap nav">
+    <a href="/" style="font-weight:800">Fitness Tracker</a>
+    <span style="flex:1"></span>
+    <a href="/exercises" class="badge">Exercises</a>
+    <a href="/workouts" class="badge">Workouts</a>
+    <a href="/sessions" class="badge">Sessions</a>
+  </nav>
+</header>
 
-  <main class="wrap" style="padding-top:16px; padding-bottom:40px;">
-    <h1>Welcome</h1>
-    <div class="card fade-in" style="margin-top:12px">
-      <p class="hint">Start by adding a few exercises → <a class="badge" href="/exercises">Go to Exercises</a></p>
-    </div>
+<main class="wrap">
+  <h1>Welcome</h1>
 
-    <div class="row" style="margin-top:12px">
-      <div style="grid-column:span 4">
-        <a href="/exercises" style="text-decoration:none">
-          <div class="card"><h3>Exercises</h3><p class="hint">Manage your exercise library.</p></div>
-        </a>
+  <!-- Hero CTA -->
+  <section class="card fade-in" style="margin-top:12px">
+    <div class="row" style="align-items:center">
+      <div class="form-item" style="grid-column: span 9">
+        <h2 style="color:#e9edf4; margin:0 0 4px">Start by adding a few exercises</h2>
+        <small class="hint">Your library powers Workouts and Sessions.</small>
       </div>
-      <div style="grid-column:span 4">
-        <a href="/workouts" style="text-decoration:none">
-          <div class="card"><h3>Workouts</h3><p class="hint">Build workout plans.</p></div>
-        </a>
-      </div>
-      <div style="grid-column:span 4">
-        <a href="/sessions" style="text-decoration:none">
-          <div class="card"><h3>Sessions</h3><p class="hint">Log performed sessions.</p></div>
-        </a>
+      <div class="form-item" style="grid-column: span 3; text-align:right">
+        <a href="/exercises"><button class="primary">Go to Exercises →</button></a>
       </div>
     </div>
-  </main>
+  </section>
 
-  <footer class="site-footer">
-    <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
-      <small style="color:#9aa4b2">© Fitness Tracker</small>
-      <small style="color:#9aa4b2">Sofia Gonzalez DevOps Project</small>
-    </div>
-  </footer>
+  <!-- Feature cards -->
+  <section class="row" style="margin-top:12px">
+    <a class="card" href="/exercises" style="grid-column: span 4; display:block">
+      <h3>Exercises</h3>
+      <p class="hint" style="margin-top:6px">Manage your exercise library.</p>
+    </a>
+
+    <a class="card" href="/workouts" style="grid-column: span 4; display:block">
+      <h3>Workouts</h3>
+      <p class="hint" style="margin-top:6px">Build workout plans.</p>
+    </a>
+
+    <a class="card" href="/sessions" style="grid-column: span 4; display:block">
+      <h3>Sessions</h3>
+      <p class="hint" style="margin-top:6px">Log performed sessions.</p>
+    </a>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap" style="display:flex; justify-content:space-between; padding:14px 0;">
+    <small style="color:#9aa4b2">© Fitness Tracker</small>
+    <small style="color:#9aa4b2">Sofia Gonzalez DevOps Project</small>
+  </div>
+</footer>
 </body>
 </html>
