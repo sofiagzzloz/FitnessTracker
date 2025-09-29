@@ -21,6 +21,18 @@
     </nav>
   </header>
 
+
+{% if user %}
+<script>
+document.getElementById('btn-signout')?.addEventListener('click', async () => {
+  try {
+    await fetch('/api/auth/logout', { method:'POST', credentials:'include' });
+  } catch (_) {}
+  location.assign('/login');
+});
+</script>
+{% endif %}
+
   <main class="wrap">
     <h1>Exercises</h1>
 

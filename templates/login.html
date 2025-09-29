@@ -1,49 +1,65 @@
-<!doctype html><html><head>
-    <meta charset="utf-8" />
-    <title>Login · Fitness Tracker</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head><body>
-  <header class="site-header">
-    <nav class="wrap nav">
-      <a href="/" style="font-weight:800">Fitness Tracker</a>
-    </nav>
-  </header>
-  
-  <main class="wrap">
-    <h1>Login</h1>
-    <section class="card" style="max-width:460px">
-      <div class="form-item"><label>Email</label><input id="email" type="email" /></div>
-      <div class="form-item"><label>Password</label><input id="pw" type="password" /></div>
-      <div class="form-item"><button id="btn-login" class="primary">Login</button></div>
-      <hr style="border:none;border-top:1px solid #222;margin:12px 0">
-      <small class="hint">No account? <a href="/register">Register</a></small>
-     </section>
-  </main>
-  
-  <script>
-  async function postJSON(url, body){
-    const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body), credentials:"include"});
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  }
-  document.getElementById('btn-login').addEventListener('click', async () => {
-    try{
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('pw').value;
-      await postJSON('/api/auth/login', {email, password});
-      location.href = '/';
-    }catch(e){ alert(e.message || 'Login failed'); }
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Login · Fitness Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<header class="site-header">
+  <nav class="wrap nav">
+    <a href="/" style="font-weight:800">Fitness Tracker</a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <h1>Login</h1>
+  <section class="card" style="max-width:460px">
+    <div class="form-item"><label>Email</label><input id="email" type="email" /></div>
+    <div class="form-item"><label>Password</label><input id="pw" type="password" /></div>
+    <button id="btn-login" class="primary" type="button">Login</button>
+    <hr style="border:none;border-top:1px solid #222;margin:12px 0">
+    <small class="hint">No account? <a href="/register">Register</a></small>
+  </section>
+</main>
+
+<script>
+async function postJSON(url, body){
+  const res = await fetch(url, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body),
+    credentials:"include"   // make sure cookie gets set
   });
-  document.getElementById('btn-register').addEventListener('click', async (ev) => {
-    ev.preventDefault();
-    try{
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('pw').value;
-      await postJSON('/api/auth/register', {email, password});
-      await postJSON('/api/auth/login', {email, password});
-      location.href = '/';
-    }catch(e){ alert(e.message || 'Register failed'); }
-  });
-  </script>
-  </body></html>
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// If already logged in, bounce to app
+(async () => {
+  try {
+    const me = await fetch('/api/auth/me', { credentials:'include' });
+    if (me.ok) location.replace('/');  // already authenticated
+  } catch(_) {}
+})();
+
+// Login
+const emailEl = document.getElementById('email');
+const pwEl    = document.getElementById('pw');
+document.getElementById('btn-login').addEventListener('click', onLogin);
+emailEl.addEventListener('keydown', e => { if (e.key === 'Enter') onLogin(); });
+pwEl.addEventListener('keydown', e => { if (e.key === 'Enter') onLogin(); });
+
+async function onLogin(){
+  try{
+    const email = emailEl.value.trim();
+    const password = pwEl.value;
+    if (!email || !password) return alert('Email and password required');
+    await postJSON('/api/auth/login', {email, password});
+    location.href = '/'; // go to app
+  }catch(e){ alert(e.message || 'Login failed'); }
+}
+</script>
+</body>
+</html>

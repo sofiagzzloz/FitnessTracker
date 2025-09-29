@@ -87,31 +87,29 @@ def create_exercise(
 # ---------- list ----------
 @router.get("", response_model=List[ExerciseRead])
 def list_exercises(
-    session: DBSession = Depends(get_session),
+    db: DBSession = Depends(get_session),
     user: User = Depends(get_current_user),
     q: Optional[str] = Query(None, description="Substring name match (case-insensitive)"),
     category: Optional[Category] = Query(None, description="Category filter"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    sort: str = Query("name", pattern="^(name|id)$"),
+    # IMPORTANT: default to "id" (chronological), not "name"
+    sort: str = Query("id", pattern="^(name|id)$"),
 ):
-    stmt = select(Exercise)
-    stmt = add_owner_filter(stmt, Exercise, user.id)
-
+    stmt = select(Exercise).where(Exercise.user_id == user.id)
     if q:
         stmt = stmt.where(func.lower(Exercise.name).like(f"%{q.lower()}%"))
     if category is not None:
         stmt = stmt.where(Exercise.category == category)
 
-    # sort
-    if sort == "id":
-        stmt = stmt.order_by(Exercise.id.asc())
-    else:
-        # name sort is case-insensitive
+    # stable chronological order
+    if sort == "name":
         stmt = stmt.order_by(func.lower(Exercise.name).asc(), Exercise.id.asc())
+    else:
+        stmt = stmt.order_by(Exercise.id.asc())
 
     stmt = stmt.limit(limit).offset(offset)
-    return session.exec(stmt).all()
+    return db.exec(stmt).all()
 
 # ---------- get one ----------
 @router.get("/{exercise_id}", response_model=ExerciseRead)
