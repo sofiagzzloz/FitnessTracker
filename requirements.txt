@@ -1,2 +1,9 @@
 fastapi
 uvicorn
+sqlmodel
+sqlalchemy
+pydantic
+passlib[argon2]
+python-jose
+httpx
+pytest
