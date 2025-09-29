@@ -1,3 +1,4 @@
+# app/routers/auth.py
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session as DBSession, select
@@ -5,8 +6,8 @@ from sqlmodel import Session as DBSession, select
 from ..db import get_session
 from ..models import User
 from ..auth import (
-    hash_pw, verify_pw, make_token,
-    get_current_user, set_session_cookie, clear_session_cookie,
+    hash_pw, verify_pw, make_token, get_current_user,
+    ACCESS_COOKIE, JWT_TTL
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -24,41 +25,41 @@ class MeOut(BaseModel):
     email: EmailStr
 
 @router.post("/register", response_model=MeOut, status_code=201)
-def register(payload: RegisterIn, response: Response, db: DBSession = Depends(get_session)):
-    email = payload.email.lower().strip()
-
+def register(payload: RegisterIn, db: DBSession = Depends(get_session)):
+    email = payload.email.lower()
     exists = db.exec(select(User).where(User.email == email)).first()
     if exists:
         raise HTTPException(status_code=409, detail="Email already registered")
-
     u = User(email=email, password_hash=hash_pw(payload.password))
     db.add(u)
     db.commit()
     db.refresh(u)
-
-    # optional: auto-login on register
-    token = make_token(u.id)
-    set_session_cookie(response, token)
-
     return MeOut(id=u.id, email=u.email)
 
 @router.post("/login", response_model=MeOut)
 def login(payload: LoginIn, response: Response, db: DBSession = Depends(get_session)):
-    email = payload.email.lower().strip()
-
+    email = payload.email.lower()
     u = db.exec(select(User).where(User.email == email)).first()
     if not u or not verify_pw(payload.password, u.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = make_token(u.id)
-    set_session_cookie(response, token)
-
+    response.set_cookie(
+        key=ACCESS_COOKIE,
+        value=token,
+        httponly=True,
+        secure=False,            # True in prod (HTTPS)
+        samesite="lax",
+        path="/",
+        max_age=int(JWT_TTL.total_seconds()),
+    )
     return MeOut(id=u.id, email=u.email)
 
 @router.post("/logout", status_code=204)
 def logout(response: Response):
-    clear_session_cookie(response)
-    return Response(status_code=204)
+    # IMPORTANT: mutate and return the SAME response object
+    response.delete_cookie(key=ACCESS_COOKIE, path="/")
+    return  # 204 No Content
 
 @router.get("/me", response_model=MeOut)
 def me(user: User = Depends(get_current_user)):
