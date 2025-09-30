@@ -1,4 +1,3 @@
-# app/routers/auth.py
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session as DBSession, select
