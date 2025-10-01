@@ -9,13 +9,17 @@ from sqlmodel import Session as DBSession
 from .db import get_session
 from .models import User
 
+from dotenv import load_dotenv
+import os
+load_dotenv() 
+
 # ----------------------
 # Auth config (helpers)
 # ----------------------
 ACCESS_COOKIE = "access_token"   # single source of truth
-JWT_SECRET    = "CHANGE_ME_to_a_long_random_secret"
-JWT_ALG       = "HS256"
-JWT_TTL       = timedelta(hours=12)
+JWT_SECRET    = os.getenv("JWT_SECRET", "DEV_ONLY_CHANGE_ME")
+JWT_ALG       = os.getenv("JWT_ALG", "HS256")
+JWT_TTL       = timedelta(seconds=int(os.getenv("JWT_TTL_SECONDS", 43200)))
 
 pwd_ctx = CryptContext(schemes=["argon2"], deprecated="auto")
 

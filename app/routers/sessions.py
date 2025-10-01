@@ -66,7 +66,7 @@ def create_session(
     tpl_id = payload.workout_template_id
     if tpl_id:
         # only copy items from a template that belongs to this user
-        tpl = db.get(WorkoutItem, 0)  # no-op to import class
+        tpl = db.get(WorkoutItem, 0)  
         fk_col = getattr(WorkoutItem, "workout_template_id")
         order_col = getattr(WorkoutItem, "order_index", getattr(WorkoutItem, "id"))
 
@@ -277,10 +277,6 @@ def delete_session(
 
     if item_ids:
         db.exec(delete(SessionItem).where(SessionItem.id.in_(item_ids)))
-        # If you keep SessionSet / SessionCardio tables:
-        # db.exec(delete(SessionSet).where(SessionSet.session_item_id.in_(item_ids)))
-        # db.exec(delete(SessionCardio).where(SessionCardio.session_item_id.in_(item_ids)))
-
     db.exec(delete(Session).where(Session.id == session_id))
     db.commit()
     return None

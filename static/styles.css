@@ -74,7 +74,7 @@ h3 { font-size: 15px; color: #9aa4b2; font-weight: 600; }
   border-radius: 14px;
   padding: 16px;
   box-shadow: 0 8px 30px rgba(0,0,0,.5);
-  overflow: visible; /* allow native select popup */
+  overflow: visible;
 }
 
 .row { display: grid; grid-template-columns: repeat(12,1fr); gap: 12px; }
@@ -146,7 +146,6 @@ input:focus, select:focus {
 
 /* keep native dropdown usable */
 #item-ex-select { position: relative; z-index: 10; pointer-events: auto; }
-/* just in case a sibling overlaps */
 #item-add { position: relative; z-index: 1; }
 
 /* ——— Buttons ——— */
@@ -179,7 +178,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   box-shadow: 0 10px 18px rgba(239,68,68,.28);
 }
 
-/* bring back the red pill buttons */
+/* red pill buttons */
 .btn-small { padding: 6px 10px; }
 .danger {
   background:#3a0f12;
@@ -221,8 +220,8 @@ tbody tr:hover { background: #11141a; }
 }
 
 .bodyimg{
-  position:relative;          /* IMPORTANT: anchor for absolutely positioned dots/canvas */
-  width:220px;                /* nice default width */
+  position:relative;         
+  width:220px;              
   flex:0 0 auto;
 }
 .bodyimg img{
@@ -243,7 +242,7 @@ tbody tr:hover { background: #11141a; }
 .hotspot {
   background: transparent !important;
   box-shadow: none !important;
-  opacity: .85;                 /* keep a nice glow later */
+  opacity: .85;             
 }
 
 .hotspot.primary {
@@ -280,7 +279,7 @@ tbody tr:hover { background: #11141a; }
 
 
 #external-q {
-  min-width: 320px;   /* prevents it from collapsing */
-  flex: 2;            /* takes more space relative to siblings */
-  font-size: 1rem;    /* slightly bigger text */
+  min-width: 320px;  
+  flex: 2;           
+  font-size: 1rem; 
 }

@@ -1,4 +1,3 @@
-# app/routers/external.py
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlmodel import Session as DBSession, select
@@ -107,7 +106,7 @@ def import_exercise(
     src_ref = (str(payload.get("source_ref")).strip() or None)
 
     # ----- De-dupe PER USER -----
-    # 1) Prefer (source, source_ref, user_id)
+    #Prefer (source, source_ref, user_id)
     if src_ref:
         dup = session.exec(
             select(Exercise).where(
@@ -119,7 +118,7 @@ def import_exercise(
         if dup:
             return dup
 
-    # 2) Fallback: name (case-insensitive) per user
+    # Fallback: name (case-insensitive) per user
     dup2 = session.exec(
         select(Exercise).where(
             Exercise.user_id == user.id,
@@ -129,7 +128,7 @@ def import_exercise(
     if dup2:
         return dup2
 
-    # ----- Ensure muscles exist (global table, no user scoping) -----
+    # ----- Ensure muscles exist -----
     muscles = payload.get("muscles") or {}
     slugs = set((muscles.get("primary") or []) + (muscles.get("secondary") or []))
     existing = {m.slug: m for m in session.exec(select(Muscle)).all()}

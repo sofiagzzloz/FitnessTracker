@@ -73,7 +73,7 @@ def list_exercises(
     if category is not None:
         stmt = stmt.where(Exercise.category == category)
 
-    # Keep predictable order: newest first (id desc). Change if you prefer created_at.
+    # Keep predictable order: newest first (id desc)
     stmt = stmt.order_by(Exercise.id.desc())
     stmt = stmt.limit(limit).offset(offset)
     return db.exec(stmt).all()

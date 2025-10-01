@@ -52,7 +52,7 @@ def _norm_name(s: str) -> str:
 # Domain helpers
 # -----------------------------
 def muscles_map_wger() -> Dict[int, str]:
-    # WGER muscle ids → simple slugs for your UI
+    # WGER muscle ids
     return {
         2: "chest",
         1: "biceps",
@@ -146,7 +146,7 @@ async def search_wger(query: str, limit: int = 20) -> List[dict]:
     mm = muscles_map_wger()
 
     async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
-        # 1) Sweep translations and filter locally by strict AND
+        # Sweep translations and filter locally by strict AND
         page_size = 100
         max_pages = 20
         offset = 0
@@ -191,7 +191,7 @@ async def search_wger(query: str, limit: int = 20) -> List[dict]:
             seen_ids.add(ex_id)
             unique_cand.append((ex_id, name))
 
-        # 2) Enrich via /exercise/<id>/ (stable)
+        # Enrich via /exercise/<id>/ (stable)
         out: List[dict] = []
         batch_size = 10
         for i in range(0, len(unique_cand), batch_size):
@@ -225,12 +225,12 @@ async def search_wger(query: str, limit: int = 20) -> List[dict]:
             if len(out) >= soft_cap:
                 break
 
-        # 3) Rank and cap
+        # Rank and cap
         out.sort(key=lambda e: _score_name(e["name"], q_tokens), reverse=True)
         return out[:limit]
 
 # -----------------------------
-# Public: Browse (unchanged behavior, minor hygiene)
+# Public: Browse 
 # -----------------------------
 async def browse_wger(limit: int = 20, offset: int = 0, muscle: str | None = None) -> List[dict]:
     """

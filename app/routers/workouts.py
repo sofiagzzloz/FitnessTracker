@@ -33,7 +33,7 @@ def list_templates(
     stmt = select(WorkoutTemplate).where(WorkoutTemplate.user_id == user.id)
     if q:
         stmt = stmt.where(func.lower(WorkoutTemplate.name).like(f"%{q.lower()}%"))
-    # newest first; switch to created_at if you prefer that order
+    # newest first
     stmt = stmt.order_by(WorkoutTemplate.id.desc())
     return db.exec(stmt).all()
 
@@ -114,7 +114,7 @@ def add_template_item(
             WorkoutItem.workout_template_id == template_id
         )
     ).first() or 0
-    if isinstance(cur_max, tuple):  # sqlite can return (max,) shape sometimes
+    if isinstance(cur_max, tuple):  
         cur_max = cur_max[0] or 0
     next_order = (cur_max or 0) + 1
 
@@ -135,7 +135,7 @@ def add_template_item(
     db.commit()
     db.refresh(it)
 
-    # resequence safety
+    
     items = db.exec(
         select(WorkoutItem)
         .where(WorkoutItem.workout_template_id == template_id)
@@ -197,7 +197,7 @@ def delete_template_item(
     db.delete(it)
     db.commit()
 
-    # resequence remaining
+
     items = db.exec(
         select(WorkoutItem)
         .where(WorkoutItem.workout_template_id == template_id)

@@ -1,6 +1,6 @@
-// ========== MUSCLE MAP (front/back canvases with heat gradient) ==========
+// ========== MUSCLE MAP ==========
 
-// Coordinates (percent) with optional scale "s"
+// Coordinates 
 const FRONT_POS = {
     chest:        [{x:50, y:21}],
     front_delts:  [{x:31, y:19},{x:69, y:19}],
@@ -27,7 +27,7 @@ const FRONT_POS = {
     secondary: { inner: "rgba(255, 193, 7, 0.85)",  mid: "rgba(255, 193, 7, 0.28)", outer: "rgba(255, 193, 7, 0.0)" }
   };
   
-  // Heuristic fallbacks when DB has no links
+  // Heuristic fallbacks when DB has no links - Some basic exercises
   function normName(s) { return (s || "").toLowerCase(); }
   function guessMusclesByName(name) {
     const n = normName(name);
@@ -96,15 +96,13 @@ const FRONT_POS = {
       primary:   { ...fallback.primary,   ...(server.primary   || {}) },
       secondary: { ...fallback.secondary, ...(server.secondary || {}) },
     };
-    // don’t show a muscle as secondary if it’s counted as primary
     Object.keys(merged.primary).forEach(k => { delete merged.secondary[k]; });
     return merged;
   }
-  
-  // canvas utils
+
   let _lastSummary = null;
   
-  function getCtx(which) { // 'front' | 'back'
+  function getCtx(which) { 
     const canvas = document.getElementById(`${which}-canvas`);
     const img    = document.getElementById(`body-${which}`);
     if (!canvas || !img) return null;
@@ -135,7 +133,7 @@ const FRONT_POS = {
     const x = (xPct / 100) * w;
     const y = (yPct / 100) * h;
   
-    const base = Math.min(w, h) * 0.10; // ~10% of shorter side
+    const base = Math.min(w, h) * 0.10;
     const r = base * (0.8 + 0.2 * level) * (scale || 1);
   
     const grad = ctx.createRadialGradient(x, y, r * 0.05, x, y, r);

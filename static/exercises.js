@@ -253,8 +253,6 @@ function attachExploreHandlers() {
 
   btn.addEventListener("click", run);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
-  // Optional: live search after a pause
-  // input.addEventListener('input', debounce(run, 500));
   window._extSearch = run;
 }
 
@@ -344,7 +342,7 @@ function wireLocalFilters() {
 }
 
 // -----------------------------------------------------
-// Browse-by-muscle (manual)
+// Browse-by-muscle 
 // -----------------------------------------------------
 async function fetchMuscles() {
   try {

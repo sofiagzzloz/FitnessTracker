@@ -56,9 +56,8 @@ def login(payload: LoginIn, response: Response, db: DBSession = Depends(get_sess
 
 @router.post("/logout", status_code=204)
 def logout(response: Response):
-    # IMPORTANT: mutate and return the SAME response object
     response.delete_cookie(key=ACCESS_COOKIE, path="/")
-    return  # 204 No Content
+    return  
 
 @router.get("/me", response_model=MeOut)
 def me(user: User = Depends(get_current_user)):

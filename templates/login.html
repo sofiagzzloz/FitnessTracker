@@ -57,7 +57,7 @@ async function onLogin(){
     const password = pwEl.value;
     if (!email || !password) return alert('Email and password required');
     await postJSON('/api/auth/login', {email, password});
-    location.href = '/'; // go to app
+    location.href = '/'; 
   }catch(e){ alert(e.message || 'Login failed'); }
 }
 </script>

@@ -1,0 +1,11 @@
+# virtualenvs
+.venv/
+venv/
+
+# local env files
+.env
+.env.*.local
+
+# __pycache__ etc.
+__pycache__/
+*.pyc

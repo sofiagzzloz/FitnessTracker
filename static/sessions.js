@@ -144,12 +144,11 @@ function renderItems(){
   state.items.forEach((it, idx) => {
     const tr = document.createElement('tr');
 
-    // inputs for "Actual" (for now, we store in notes until you expose SessionSet)
+    // inputs for Actual
     const inActual = h('input', { class:'input', value: it.notes || '', placeholder:'optional (e.g. 3x12 @ 50kg)' });
     const saveBtn  = h('button', { class:'btn-small', text:'Save' });
     saveBtn.addEventListener('click', async () => {
       try {
-        // requires PATCH route (see below); if you skip adding it, remove this listener
         await apiPatchSessionItem(state.selectedId, it.id, { notes: inActual.value || null });
         it.notes = inActual.value || null;
       } catch (e) {
@@ -177,8 +176,8 @@ function renderItems(){
   });
 }
 
-// -------- heatmap: reuse the workouts canvas painter --------
-// (this is the minimal glue to call the same functions already in /static/workouts.js)
+// -------- heatmap --------
+
 function pretty(slug){ return slug.replace(/_/g,' '); }
 
 function ensureHeatmapCanvases(){
@@ -190,7 +189,7 @@ function ensureHeatmapCanvases(){
 }
 
 async function drawSessionHeatmap(workoutTemplateId){
-  // 1) get the server summary (template-based)
+  // get the server summary 
   let server = { primary:{}, secondary:{} };
   try {
     if (workoutTemplateId) {
@@ -199,8 +198,7 @@ async function drawSessionHeatmap(workoutTemplateId){
     }
   } catch (_) { /* ignore */ }
 
-  // 2) build a fallback summary from what’s on screen right now
-  //    (guesses primaries from exercise names)
+  //build a fallback summary from what’s on screen right now, in case the server has none
   let fallback = { primary:{}, secondary:{} };
   try {
     if (window.heatmapFallback) {
@@ -208,10 +206,9 @@ async function drawSessionHeatmap(workoutTemplateId){
     }
   } catch (_) { /* ignore */ }
 
-  // 3) merge – keep primaries as primary; don’t duplicate as secondary
+  // keep primaries as primary; don’t duplicate as secondary
   const merged = (window.heatmapMerge ? window.heatmapMerge(server, fallback) : server);
 
-  // 4) size canvases and draw
   ensureHeatmapCanvases();
   if (window.applyMapColors) window.applyMapColors(merged);
 }
@@ -252,7 +249,7 @@ async function selectSession(id){
   // show editor area
   setEditorEnabled(true);
 
-  // ---- planned (from template) ----
+  // ---- planned from already made workouts ----
   state.plannedByExId.clear();
   if (s.workout_template_id) {
     try {
@@ -278,12 +275,12 @@ async function selectSession(id){
   }
   renderItems();
 
-  // ---- chips + note (same shape as workouts) ----
+  // ---- chips + note ----
   el('chips-primary').innerHTML = '';
   el('chips-secondary').innerHTML = '';
   el('map-note').textContent = state.items.length ? '' : 'No items.';
 
-  // ---- heatmap (make sure canvases match the images) ----
+  // ---- heatmap ----
   try {
     // wait for body images if needed
     const imgs = [el('body-front'), el('body-back')].filter(Boolean);
@@ -331,7 +328,6 @@ el('sess-delete')?.addEventListener('click', async () => {
     el('sess-editor').style.display = 'none';
     if (el('sess-delete')) el('sess-delete').style.display = 'none';
 
-    // If it somehow persisted, surface that immediately
     if (stillThere) {
       alert('The session is still listed after delete. This usually means the server blocked the delete (FK constraint). See backend notes.');
     }
@@ -377,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ad-hoc add (“Add to session”) keeps your current UI, just pointing to the session
+  // add-exercise select
   const addSel = el('add-ex-select');
   if (addSel) {
     addSel.innerHTML = '<option value="">Loading...</option>';
@@ -401,7 +397,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Start session
-  el('sess-create')?.addEventListener('click', async () => {   // FIXED: matches HTML id
+  el('sess-create')?.addEventListener('click', async () => {   
     const tplId = Number(el('sess-template')?.value || 0) || null;
     const date  = (el('sess-date')?.value || '').trim();
     const title = (el('sess-title-input')?.value || '').trim() || null;

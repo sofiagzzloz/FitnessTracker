@@ -5,7 +5,6 @@ async function apiFetch(url, opts = {}) {
     ...opts,
   };
   const res = await fetch(url, merged);
-  // You can choose to auto-redirect on 401 here if you like:
   if (res.status === 401 && !url.startsWith("/api/auth")) {
     location.href = "/login";
     return Promise.reject(new Error("Unauthorized"));
@@ -48,7 +47,7 @@ function setPlannerForCardio(on) {
   const inReps   = el('item-reps');
   const inWeight = el('item-weight');
 
-  // Labels (if you added the optional IDs)
+  // Labels 
   const lblSets   = document.getElementById('lbl-sets');
   const lblReps   = document.getElementById('lbl-reps');
   const lblWeight = document.getElementById('lbl-weight');
@@ -61,7 +60,6 @@ function setPlannerForCardio(on) {
 
     inSets.type = 'number';   inSets.min = '0';  inSets.placeholder = '30';
     inReps.type = 'number';   inReps.min = '0';  inReps.step = '0.1'; inReps.placeholder = '5 (km/mi)';
-    // use "weight" box as a free text note in cardio
     inWeight.type = 'text';   inWeight.placeholder = 'e.g. 5:30/km or HR 150';
 
   } else {
@@ -187,7 +185,7 @@ function renderItems() {
     const tdPln = h("td", {}, planText(it));
     const tdAct = h("td", { class: "right" });
 
-    // view-mode actions: Edit + Remove
+    // actions: Edit + Remove
     const editBtn = h("button", { class: "btn-small", text: "Edit" });
     const delBtn  = h("button", { class: "btn-small danger", text: "Remove" });
 
@@ -241,14 +239,14 @@ function enterEditRow(tr, it) {
   tdAct.append(saveBtn, document.createTextNode(" "), cancelBtn, document.createTextNode(" "), delBtn);
   tdAct.classList.add("right");
 
-  // Remove (same as view)
+  // Remove 
   delBtn.addEventListener("click", async () => {
     if (!confirm("Remove item?")) return;
     try { await apiDeleteItem(it.id); await refreshItems(); }
     catch (e) { alert(e.message || "Delete failed"); }
   });
 
-  // Save → PATCH
+  // Save 
   saveBtn.addEventListener("click", async () => {
     try {
       await apiPatchItem(it.id, {
@@ -262,7 +260,7 @@ function enterEditRow(tr, it) {
     }
   });
 
-  // Cancel → go back to view mode
+  // Cancel 
   cancelBtn.addEventListener("click", () => {
     tdPln.textContent = planText(it);
     tdAct.innerHTML = "";
@@ -285,7 +283,7 @@ function enterEditRow(tr, it) {
   inSets.focus();
 }
 
-// tiny UI helper to label small inputs inside the Planned cell
+// UI helper to label small inputs inside the Planned cell
 function wrapMiniField(lbl, inputEl){
   const box = document.createElement("span");
   box.style.display = "inline-flex";
@@ -310,7 +308,7 @@ function planText(it) {
     return parts || pace || '—';
   }
 
-  // strength (original)
+  // strength 
   const parts = [];
   if (it.planned_sets) parts.push(`${it.planned_sets}x`);
   if (it.planned_reps) parts.push(`${it.planned_reps}`);
@@ -319,9 +317,9 @@ function planText(it) {
   return parts.join(" ");
 }
 
-// ========== MUSCLE MAP (front/back canvases with heat gradient) ==========
+// ========== MUSCLE MAP  ==========
 
-// Coordinates (percent) with optional scale "s"
+// Coordinates 
 const FRONT_POS = {
   chest:        [{x:50, y:21}],
   front_delts:  [{x:31, y:19},{x:69, y:19}],
@@ -422,10 +420,10 @@ function mergeSummaries(server, fallback) {
   return merged;
 }
 
-// canvas utils
+
 let _lastSummary = null;
 
-function getCtx(which) { // 'front' | 'back'
+function getCtx(which) { 
   const canvas = document.getElementById(`${which}-canvas`);
   const img    = document.getElementById(`body-${which}`);
   if (!canvas || !img) return null;
@@ -456,7 +454,7 @@ function drawSpot(ctx, xPct, yPct, level, role, scale = 1) {
   const x = (xPct / 100) * w;
   const y = (yPct / 100) * h;
 
-  const base = Math.min(w, h) * 0.10; // ~10% of shorter side
+  const base = Math.min(w, h) * 0.10; 
   const r = base * (0.8 + 0.2 * level) * (scale || 1);
 
   const grad = ctx.createRadialGradient(x, y, r * 0.05, x, y, r);
@@ -514,7 +512,6 @@ function applyMapColors(summary) {
 // Redraw when window resizes so canvases match images
 window.addEventListener("resize", () => {
   if (!_lastSummary) return;
-  // ensure images laid out before sizing canvases
   const imgs = [...document.querySelectorAll(".bodyimg img")];
   Promise.all(imgs.map(img => (img.complete ? Promise.resolve() : new Promise(r => img.onload = r))))
     .then(() => applyMapColors(_lastSummary));
@@ -549,8 +546,8 @@ async function refreshItems(){
       (serverSummary?.secondary && Object.keys(serverSummary.secondary).length);
 
     const summary = hasServerData
-      ? mergeSummaries(serverSummary, fallbackSummary)  // combine: server > fallback
-      : fallbackSummary;                                 // only fallback
+      ? mergeSummaries(serverSummary, fallbackSummary)  
+      : fallbackSummary;                                 
 
     applyMapColors(summary);
   } catch (e) {
@@ -569,7 +566,6 @@ async function initExercisesSelect() {
   try {
     state.exercises = await apiListExercises();
 
-    // build category map
     exCategoryById.clear();
     state.exercises.forEach(ex => {
       if (ex && ex.id) exCategoryById.set(ex.id, (ex.category || '').toLowerCase());
@@ -647,7 +643,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (e) { alert(e.message || "Delete failed"); }
   });
 
-  // add item
+
 // add item
 el("item-add").addEventListener("click", async () => {
   if (!state.selectedId) return;
@@ -705,13 +701,13 @@ el("item-add").addEventListener("click", async () => {
   await refreshWorkouts();
   setEditorEnabled(false);
 
-  // ensure canvases draw once images have measured sizes
+ 
   const imgs = [...document.querySelectorAll(".bodyimg img")];
   await Promise.all(imgs.map(img => (img.complete ? Promise.resolve() : new Promise(r => img.onload = r))));
   if (state.selectedId) await refreshItems();
 });
 
-// select → console log
+// select 
 const sel = el("item-ex-select");
 if (sel) {
   sel.addEventListener("change", () => {

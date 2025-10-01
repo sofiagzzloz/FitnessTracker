@@ -3,7 +3,6 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import os
 
-# Always use fitness.db unless DATABASE_URL override is set
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///fitness.db")
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
