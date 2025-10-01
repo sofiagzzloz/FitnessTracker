@@ -32,28 +32,28 @@ app.include_router(auth_router.router)  # uses /api/auth/*
 # ---- Public pages ----
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html", {"user": None})
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(request, "register.html", {"user": None})
 
 # ---- Auth-required pages ----
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, user: User = Depends(get_current_user)):
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "index.html", {"user": user})
 
 @app.get("/exercises", response_class=HTMLResponse)
 def exercises_page(request: Request, user: User = Depends(get_current_user)):
-    return templates.TemplateResponse("exercises.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "exercises.html", {"user": user})
 
 @app.get("/workouts", response_class=HTMLResponse)
 def workouts_page(request: Request, user: User = Depends(get_current_user)):
-    return templates.TemplateResponse("workouts.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "workouts.html", {"user": user})
 
 @app.get("/sessions", response_class=HTMLResponse)
 def sessions_page(request: Request, user: User = Depends(get_current_user)):
-    return templates.TemplateResponse("sessions.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request, "sessions.html", {"user": user})
 
 # ---- Debug helpers ----
 @app.get("/__debug/static-path")

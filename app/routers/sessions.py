@@ -33,7 +33,7 @@ def _today() -> dt.date:
     return dt.date.today()
 
 def _now() -> dt.datetime:
-    return dt.datetime.utcnow()
+     return dt.datetime.now(dt.timezone.utc)
 
 def _exercise_or_400(db: DBSession, ex_id: int, user_id: int) -> Exercise:
     ex = db.get(Exercise, ex_id)
