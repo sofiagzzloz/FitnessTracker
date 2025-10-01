@@ -32,6 +32,7 @@ It supports authentication, exercise/workout/session management, and external ex
 
 
 ## Project Structure
+```bash
 fitness_tracker/
 ├── app/
 │   ├── main.py                    
@@ -71,6 +72,7 @@ fitness_tracker/
 ├── requirements.txt
 ├── .env.example                    
 └── README.md
+```
 
 ## Setup Instructions
 
