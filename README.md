@@ -113,6 +113,6 @@ Current test coverage:
 ## Future Work
 For Assignment 2
 - Switch from SQLite → PostgreSQL for deployment
-- Dockerize services (FastAPI app, DB, Nginx reverse proxy)
+- Dockerize services (FastAPI app, DB)
 - CI/CD integration (GitHub Actions)
-- Production-grade security: HTTPS-only cookies, rotated JWT secret
+
