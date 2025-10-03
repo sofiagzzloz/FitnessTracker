@@ -64,9 +64,8 @@ let _browseState = { muscle: "", limit: 12, offset: 0, loading: false };
 const _cache = { search: new Map(), browse: new Map() };
 const _aborters = { search: null, browse: null };
 
-// -----------------------------------------------------
+
 // Add local exercise
-// -----------------------------------------------------
 async function createExercise(payload) {
   const res = await apiFetch("/api/exercises", {
     method: "POST",
@@ -112,9 +111,7 @@ function attachAddExerciseHandler() {
   });
 }
 
-// -----------------------------------------------------
 // Delete usage modal
-// -----------------------------------------------------
 function showUsageModal(usage) {
   const modal = el("delete-usage-modal");
   if (!modal) {
@@ -153,9 +150,7 @@ document.addEventListener("click", (ev) => {
   }
 });
 
-// -----------------------------------------------------
 // External search (NAME ONLY)
-// -----------------------------------------------------
 async function searchExternal(q) {
   const key = tokens(q).join(" ");
   if (_cache.search.has(key)) return _cache.search.get(key);
@@ -256,9 +251,7 @@ function attachExploreHandlers() {
   window._extSearch = run;
 }
 
-// -----------------------------------------------------
 // Delete one local exercise
-// -----------------------------------------------------
 async function deleteExercise(id) {
   const res = await apiFetch(`/api/exercises/${id}`, { method: "DELETE" });
   if (res.status === 204) return { status: "deleted" };
@@ -283,9 +276,7 @@ async function deleteExercise(id) {
   return { status: "error", message: txt || `Delete failed (${res.status})` };
 }
 
-// -----------------------------------------------------
 // Import from external
-// -----------------------------------------------------
 async function importExternal(obj) {
   const res = await apiFetch("/api/external/exercises/import", {
     method: "POST",
@@ -298,9 +289,7 @@ async function importExternal(obj) {
   return res.json();
 }
 
-// -----------------------------------------------------
 // Local exercises table
-// -----------------------------------------------------
 async function fetchLocalExercises() {
   const q = (el("ex-q") && el("ex-q").value ? el("ex-q").value : "").trim();
   const cat = (el("ex-cat-filter") && el("ex-cat-filter").value ? el("ex-cat-filter").value : "").trim();
@@ -341,9 +330,7 @@ function wireLocalFilters() {
   if (cat) cat.addEventListener("input", debounce(fetchLocalExercises, 250));
 }
 
-// -----------------------------------------------------
 // Browse-by-muscle 
-// -----------------------------------------------------
 async function fetchMuscles() {
   try {
     const res = await apiFetch("/api/external/muscles");
@@ -484,9 +471,7 @@ function attachBrowseHandlers() {
   });
 }
 
-// -----------------------------------------------------
 // Tabs (Search | Browse) + boot
-// -----------------------------------------------------
 function attachTabs() {
   const tabSearch = el("tab-search");
   const tabBrowse = el("tab-browse");
