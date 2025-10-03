@@ -13,9 +13,7 @@ from dotenv import load_dotenv
 import os
 load_dotenv() 
 
-# ----------------------
 # Auth config (helpers)
-# ----------------------
 ACCESS_COOKIE = "access_token"   # single source of truth
 JWT_SECRET    = os.getenv("JWT_SECRET", "DEV_ONLY_CHANGE_ME")
 JWT_ALG       = os.getenv("JWT_ALG", "HS256")
@@ -45,9 +43,7 @@ def _read_token(token: str) -> int:
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-# ----------------------
 # Dependency
-# ----------------------
 def get_current_user(request: Request, db: DBSession = Depends(get_session)) -> User:
     token = request.cookies.get(ACCESS_COOKIE)
     if not token:
