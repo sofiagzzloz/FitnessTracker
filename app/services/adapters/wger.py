@@ -8,9 +8,8 @@ import httpx
 WGER_API = "https://wger.de/api/v2"
 
 
-# -----------------------------
+
 # Normalization & token helpers
-# -----------------------------
 _PUNCT_RE = re.compile(r"[^\w\s]+")
 _WS_RE = re.compile(r"\s+")
 
@@ -48,9 +47,8 @@ def _norm_name(s: str) -> str:
     return " ".join((s or "").strip().split())
 
 
-# -----------------------------
+
 # Domain helpers
-# -----------------------------
 def muscles_map_wger() -> Dict[int, str]:
     # WGER muscle ids
     return {
@@ -75,9 +73,7 @@ def category_for(name: str) -> str:
     return "cardio" if any(t in n for t in ["run", "treadmill", "bike", "row"]) else "strength"
 
 
-# -----------------------------
 # HTTP helpers
-# -----------------------------
 async def _fetch_exercise_detail(client: httpx.AsyncClient, ex_id: int) -> dict:
     try:
         r = await client.get(f"{WGER_API}/exercise/{ex_id}/")
@@ -103,9 +99,8 @@ def _cand_from_translation(t_data: dict) -> list[tuple[int, str]]:
         out.append((ex_id, name))
     return out
 
-# -----------------------------
+
 # Scoring
-# -----------------------------
 def _score_name(name: str, q_tokens: List[str]) -> Tuple[int, int, int, int]:
     """
     Higher is better:
@@ -121,9 +116,8 @@ def _score_name(name: str, q_tokens: List[str]) -> Tuple[int, int, int, int]:
     exact_phrase = 1 if n_norm == " ".join(q_tokens) else 0
     return (exact_phrase, exact_word_hits, prefix_hits, -len(n_norm))
 
-# -----------------------------
+
 # Public: Search (strict AND)
-# -----------------------------
 async def search_wger(query: str, limit: int = 20) -> List[dict]:
     """
     Strategy:
@@ -229,9 +223,8 @@ async def search_wger(query: str, limit: int = 20) -> List[dict]:
         out.sort(key=lambda e: _score_name(e["name"], q_tokens), reverse=True)
         return out[:limit]
 
-# -----------------------------
+
 # Public: Browse 
-# -----------------------------
 async def browse_wger(limit: int = 20, offset: int = 0, muscle: str | None = None) -> List[dict]:
     """
     Browse English exercise names with pagination. Optional 'muscle' filters by
