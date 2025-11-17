@@ -3,20 +3,25 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///fitness.db")
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+DEFAULT_DB_URL = "postgresql+psycopg://fitness:fitness@localhost:5432/fitness"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
+
+connect_args = {}
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
 
 engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
 
 # Enforce foreign keys for SQLite
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_conn, _):
-    try:
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON;")
-        cursor.close()
-    except Exception:
-        pass
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, _):
+        try:
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON;")
+            cursor.close()
+        except Exception:
+            pass
 
 def init_db() -> None:
     from . import models
