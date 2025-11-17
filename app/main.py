@@ -19,6 +19,7 @@ app = FastAPI(title="Fitness Tracker")
 # ---- CORS Configuration for Azure Deployment ----
 origins = [
     "https://fitness-frontend.redglacier-88610d81.eastus.azurecontainerapps.io",
+    "https://fitness-backend.redglacier-88610d81.eastus.azurecontainerapps.io",
     "http://localhost:8080",
     "http://localhost:8000",
     "http://127.0.0.1:8080",
