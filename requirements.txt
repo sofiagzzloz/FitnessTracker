@@ -7,3 +7,6 @@ passlib[argon2]
 python-jose
 httpx
 pytest
+pytest-cov
+prometheus-client
+email-validator
