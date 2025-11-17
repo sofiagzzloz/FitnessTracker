@@ -24,42 +24,17 @@
   </section>
 </main>
 
-<script>
-async function postJSON(url, body){
-  const res = await fetch(url, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body),
-    credentials:"include"   // make sure cookie gets set
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
+<script type="module">
+import { API_BASE } from '/static/config.js';
 
 // If already logged in, bounce to app
 (async () => {
   try {
-    const me = await fetch('/api/auth/me', { credentials:'include' });
+    const me = await fetch(`${API_BASE}/api/auth/me`, { credentials:'include' });
     if (me.ok) location.replace('/');  // already authenticated
   } catch(_) {}
 })();
-
-// Login
-const emailEl = document.getElementById('email');
-const pwEl    = document.getElementById('pw');
-document.getElementById('btn-login').addEventListener('click', onLogin);
-emailEl.addEventListener('keydown', e => { if (e.key === 'Enter') onLogin(); });
-pwEl.addEventListener('keydown', e => { if (e.key === 'Enter') onLogin(); });
-
-async function onLogin(){
-  try{
-    const email = emailEl.value.trim();
-    const password = pwEl.value;
-    if (!email || !password) return alert('Email and password required');
-    await postJSON('/api/auth/login', {email, password});
-    location.href = '/'; 
-  }catch(e){ alert(e.message || 'Login failed'); }
-}
 </script>
+<script type="module" src="/static/auth.js"></script>
 </body>
 </html>
