@@ -6,7 +6,9 @@ pydantic
 passlib[argon2]
 python-jose
 httpx
+jinja2
+prometheus-client
 pytest
 pytest-cov
-prometheus-client
 email-validator
+psycopg[binary]
