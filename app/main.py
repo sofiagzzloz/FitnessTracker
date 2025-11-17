@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 import time
 
@@ -14,6 +15,23 @@ from .routers import exercises, workouts, sessions, external, auth as auth_route
 
 
 app = FastAPI(title="Fitness Tracker")
+
+# ---- CORS Configuration for Azure Deployment ----
+origins = [
+    "https://fitness-frontend.redglacier-88610d81.eastus.azurecontainerapps.io",
+    "http://localhost:8080",
+    "http://localhost:8000",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -88,22 +106,30 @@ def metrics():
 # ---- Auth-required pages ----
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, user: User = Depends(get_current_user)):
-   return templates.TemplateResponse(request, "index.html", {"user": user})
+    if user is None:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "index.html", {"user": user})
 
 
 @app.get("/exercises", response_class=HTMLResponse)
 def exercises_page(request: Request, user: User = Depends(get_current_user)):
-   return templates.TemplateResponse(request, "exercises.html", {"user": user})
+    if user is None:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "exercises.html", {"user": user})
 
 
 @app.get("/workouts", response_class=HTMLResponse)
 def workouts_page(request: Request, user: User = Depends(get_current_user)):
-   return templates.TemplateResponse(request, "workouts.html", {"user": user})
+    if user is None:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "workouts.html", {"user": user})
 
 
 @app.get("/sessions", response_class=HTMLResponse)
 def sessions_page(request: Request, user: User = Depends(get_current_user)):
-   return templates.TemplateResponse(request, "sessions.html", {"user": user})
+    if user is None:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "sessions.html", {"user": user})
 
 
 # ---- Debug helpers ----

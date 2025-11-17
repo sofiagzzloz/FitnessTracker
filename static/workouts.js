@@ -1,12 +1,15 @@
+import { API_BASE } from "./config.js";
+
 async function apiFetch(url, opts = {}) {
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
   const merged = {
-    credentials: "include",                       
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
     ...opts,
   };
-  const res = await fetch(url, merged);
+  const res = await fetch(fullUrl, merged);
   if (res.status === 401 && !url.startsWith("/api/auth")) {
-    location.href = "/login";
+    location.href = "/login.html";
     return Promise.reject(new Error("Unauthorized"));
   }
   return res;

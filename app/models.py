@@ -33,10 +33,10 @@ class User(SQLModel, table=True):
 # ---------- Exercises & Muscles ----------
 class Exercise(SQLModel, table=True):
     """
-    Library of movements. Now scoped by user_id.
+    Library of movements. Scoped by user_id.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)   # <-- added
+    user_id: int = Field(foreign_key="user.id", index=True)
     name: str = Field(index=True)
     category: Category = Field(default=Category.strength)
     default_unit: Optional[str] = None
@@ -57,13 +57,13 @@ class ExerciseMuscle(SQLModel, table=True):
     role: MuscleRole = Field(default=MuscleRole.primary)
 
 
-# ---------- Workout Templates (Plans) ----------
+# ---------- Workout Templates ----------
 class WorkoutTemplate(SQLModel, table=True):
     """
-    Blueprint you build once and reuse. Scoped by user_id.
+    Blueprint workouts scoped by user.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)   # <-- added
+    user_id: int = Field(foreign_key="user.id", index=True)
     name: str
     notes: Optional[str] = None
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
@@ -72,21 +72,20 @@ class WorkoutTemplate(SQLModel, table=True):
 
 class WorkoutItem(SQLModel, table=True):
     """
-    Items live under a template. We don't store user_id here because
-    ownership comes via the parent template.
+    Items under a workout template.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
     workout_template_id: int = Field(foreign_key="workouttemplate.id", index=True)
     order_index: int = Field(default=0, index=True)
     exercise_id: int = Field(foreign_key="exercise.id", index=True)
 
-    # Planned for strength
+    # Strength planning
     planned_sets: Optional[int] = None
     planned_reps: Optional[int] = None
     planned_weight: Optional[float] = None
     planned_rpe: Optional[float] = None
 
-    # Planned for cardio
+    # Cardio planning
     planned_minutes: Optional[int] = None
     planned_distance: Optional[float] = None
     planned_distance_unit: Optional[str] = None
@@ -96,17 +95,20 @@ class WorkoutItem(SQLModel, table=True):
     updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
 
 
-# ---------- Sessions (Logged / Performed) ----------
+# ---------- Sessions ----------
 class Session(SQLModel, table=True):
     """
-    Actual workouts tied to a date. Scoped by user_id.
+    Logged workouts per date.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)   # <-- added
+    user_id: int = Field(foreign_key="user.id", index=True)
     date: dt.date = Field(index=True)
     title: Optional[str] = None
     notes: Optional[str] = None
+
+    # Optional reference to template
     workout_template_id: Optional[int] = Field(default=None, foreign_key="workouttemplate.id")
+
     status: SessionStatus = Field(default=SessionStatus.completed)
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
     updated_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
