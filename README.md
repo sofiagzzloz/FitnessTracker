@@ -110,6 +110,38 @@ Current test coverage:
 - Workouts: templates, items, muscle summaries
 - Sessions: create, list, update, delete
 
+## Docker Build & Deployment
+
+### Frontend (Nginx) Build with Cache Busting
+
+When building the frontend Docker image, use the `CACHE_BUST` build argument to force Docker to rebuild static file layers:
+
+```bash
+# Build with cache busting (use timestamp or version number)
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg CACHE_BUST=$(date +%s) \
+  -f frontend.Dockerfile \
+  -t <your-acr>.azurecr.io/fitness-frontend:latest \
+  --push \
+  .
+
+# Or use a version number
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg CACHE_BUST=dev12 \
+  -f frontend.Dockerfile \
+  -t <your-acr>.azurecr.io/fitness-frontend:latest \
+  --push \
+  .
+```
+
+**Important**: Always increment the `CACHE_BUST` value when static files change. This ensures Docker doesn't use cached layers for the `COPY static` command.
+
+### Why Cache Busting is Needed
+
+Docker caches layers based on file checksums. If Docker thinks files haven't changed, it reuses cached layers even after you've modified files. The `CACHE_BUST` build argument invalidates the cache, forcing Docker to rebuild the static file layers.
+
 ## Future Work
 For Assignment 2
 - Switch from SQLite → PostgreSQL for deployment
