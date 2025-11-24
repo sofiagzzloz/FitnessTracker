@@ -115,6 +115,7 @@ class SessionItemRead(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+
 # ---------- Strength Sets ----------
 class SessionSetCreate(BaseModel):
     set_number: int

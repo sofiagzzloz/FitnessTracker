@@ -35,6 +35,7 @@ class Exercise(SQLModel, table=True):
     """
     Library of movements. Scoped by user_id.
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     name: str = Field(index=True)
@@ -62,6 +63,7 @@ class WorkoutTemplate(SQLModel, table=True):
     """
     Blueprint workouts scoped by user.
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     name: str
@@ -74,6 +76,7 @@ class WorkoutItem(SQLModel, table=True):
     """
     Items under a workout template.
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     workout_template_id: int = Field(foreign_key="workouttemplate.id", index=True)
     order_index: int = Field(default=0, index=True)
@@ -100,6 +103,7 @@ class Session(SQLModel, table=True):
     """
     Logged workouts per date.
     """
+
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     date: dt.date = Field(index=True)
@@ -107,7 +111,9 @@ class Session(SQLModel, table=True):
     notes: Optional[str] = None
 
     # Optional reference to template
-    workout_template_id: Optional[int] = Field(default=None, foreign_key="workouttemplate.id")
+    workout_template_id: Optional[int] = Field(
+        default=None, foreign_key="workouttemplate.id"
+    )
 
     status: SessionStatus = Field(default=SessionStatus.completed)
     created_at: dt.datetime = Field(default_factory=dt.datetime.utcnow)
