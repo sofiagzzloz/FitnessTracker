@@ -35,6 +35,7 @@ engine = create_engine(
 
 # SQLite foreign keys if needed
 if DATABASE_URL.startswith("sqlite"):
+
     @event.listens_for(Engine, "connect")
     def set_sqlite_pragma(dbapi_conn, _):
         cursor = dbapi_conn.cursor()
@@ -45,16 +46,16 @@ if DATABASE_URL.startswith("sqlite"):
 def init_db() -> None:
     print("  Running init_db()...", flush=True)
     try:
-        from . import models
+        from . import models  # noqa: F401
+
         SQLModel.metadata.create_all(engine)
         print(" init_db completed successfully!", flush=True)
     except Exception as e:
         print(" init_db FAILED:", e, flush=True)
         traceback.print_exc()
-        sys.exit(1)  #  force crash so Azure shows logs
+        sys.exit(1)  # force crash so Azure shows logs
 
 
 def get_session():
     with Session(engine) as session:
         yield session
-        

@@ -46,31 +46,35 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 @app.on_event("startup")
 def on_startup() -> None:
-   init_db()
+    init_db()
 
 
 # ---- Metrics ----
 REQUEST_COUNT = Counter(
-   "http_requests_total",
-   "Total HTTP requests",
-   ["method", "path", "status"],
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
 )
 REQUEST_LATENCY = Histogram(
-   "http_request_latency_seconds",
-   "Request latency",
-   ["method", "path"],
+    "http_request_latency_seconds",
+    "Request latency",
+    ["method", "path"],
 )
 
 
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
-   start = time.perf_counter()
-   response = await call_next(request)
-   path = request.url.path
-   method = request.method
-   REQUEST_COUNT.labels(method=method, path=path, status=str(response.status_code)).inc()
-   REQUEST_LATENCY.labels(method=method, path=path).observe(time.perf_counter() - start)
-   return response
+    start = time.perf_counter()
+    response = await call_next(request)
+    path = request.url.path
+    method = request.method
+    REQUEST_COUNT.labels(
+        method=method, path=path, status=str(response.status_code)
+    ).inc()
+    REQUEST_LATENCY.labels(method=method, path=path).observe(
+        time.perf_counter() - start
+    )
+    return response
 
 
 # ---- APIs ----
@@ -89,19 +93,21 @@ def login_page(request: Request):
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request, "user": None})
+    return templates.TemplateResponse(
+        "register.html", {"request": request, "user": None}
+    )
 
 
 # ---- Health & Metrics ----
 @app.get("/health")
 def health():
-   return {"status": "ok"}
+    return {"status": "ok"}
 
 
 @app.get("/metrics")
 def metrics():
-   data = generate_latest()  # type: ignore
-   return PlainTextResponse(data.decode("utf-8"), media_type=CONTENT_TYPE_LATEST)
+    data = generate_latest()  # type: ignore
+    return PlainTextResponse(data.decode("utf-8"), media_type=CONTENT_TYPE_LATEST)
 
 
 # ---- Auth-required pages ----
@@ -116,38 +122,44 @@ def home(request: Request, user: User = Depends(get_current_user)):
 def exercises_page(request: Request, user: User = Depends(get_current_user)):
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return templates.TemplateResponse("exercises.html", {"request": request, "user": user})
+    return templates.TemplateResponse(
+        "exercises.html", {"request": request, "user": user}
+    )
 
 
 @app.get("/workouts", response_class=HTMLResponse)
 def workouts_page(request: Request, user: User = Depends(get_current_user)):
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return templates.TemplateResponse("workouts.html", {"request": request, "user": user})
+    return templates.TemplateResponse(
+        "workouts.html", {"request": request, "user": user}
+    )
 
 
 @app.get("/sessions", response_class=HTMLResponse)
 def sessions_page(request: Request, user: User = Depends(get_current_user)):
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return templates.TemplateResponse("sessions.html", {"request": request, "user": user})
+    return templates.TemplateResponse(
+        "sessions.html", {"request": request, "user": user}
+    )
 
 
 # ---- Debug helpers ----
 @app.get("/__debug/static-path")
 def debug_static_path():
-   return PlainTextResponse(str(STATIC_DIR))
+    return PlainTextResponse(str(STATIC_DIR))
 
 
 @app.get("/__debug/templates-path")
 def debug_templates_path():
-   return PlainTextResponse(str(TEMPLATES_DIR))
+    return PlainTextResponse(str(TEMPLATES_DIR))
 
 
 # ---- Logout page route: clear BOTH cookie names then redirect ----
 @app.get("/logout")
 def logout_page():
-   resp = RedirectResponse("/login", status_code=303)
-   for name in ("access_token", "session"):
-       resp.delete_cookie(key=name, path="/")
-   return resp
+    resp = RedirectResponse("/login", status_code=303)
+    for name in ("access_token", "session"):
+        resp.delete_cookie(key=name, path="/")
+    return resp

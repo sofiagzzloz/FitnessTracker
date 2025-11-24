@@ -1,4 +1,5 @@
 """Production entry point for running the FastAPI app under Uvicorn."""
+
 from __future__ import annotations
 
 import os

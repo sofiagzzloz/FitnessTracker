@@ -15,6 +15,7 @@ from sqlmodel import SQLModel, create_engine, Session
 from app.main import app
 from app.db import get_session as prod_get_session
 
+
 @pytest.fixture(scope="session")
 def _test_db_url():
     env_url = os.getenv("TEST_DATABASE_URL")
@@ -30,19 +31,25 @@ def _test_db_url():
         with contextlib.suppress(FileNotFoundError):
             os.remove(path)
 
+
 @pytest.fixture(scope="session")
 def _engine(_test_db_url):
-    connect_args = {"check_same_thread": False} if _test_db_url.startswith("sqlite") else {}
+    connect_args = (
+        {"check_same_thread": False} if _test_db_url.startswith("sqlite") else {}
+    )
     engine = create_engine(_test_db_url, connect_args=connect_args)
     # Import models to register metadata, then create tables
     from app import models  # noqa: F401
+
     SQLModel.metadata.create_all(engine)
     return engine
+
 
 @pytest.fixture
 def db(_engine):
     with Session(_engine) as s:
         yield s
+
 
 @pytest.fixture
 def client(db, _engine):
