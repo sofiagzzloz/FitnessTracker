@@ -92,7 +92,9 @@ source .venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
 ```
 ### 4. Environment variables
-Copy .env.example and turn it into .env, then edit as needed 
+Copy .env.example and turn it into .env, then edit as needed. Key values:
+- `DATABASE_URL=sqlite:///./fitness.db` → local default (set to your managed Postgres/SQL when deploying)
+- `JWT_SECRET`, `JWT_ALG`, `JWT_TTL_SECONDS`
 
 ### 5. Run development Server
 ```bash
@@ -142,9 +144,50 @@ docker buildx build \
 
 Docker caches layers based on file checksums. If Docker thinks files haven't changed, it reuses cached layers even after you've modified files. The `CACHE_BUST` build argument invalidates the cache, forcing Docker to rebuild the static file layers.
 
+## Azure Deployment & CI/CD
+
+### App Service container deployment
+1. Build the backend image with `docker/backend.Dockerfile` (now running `python -m app.server`).
+2. Create an Azure Web App for Containers (Linux) and point it at the image hosted in GHCR (`ghcr.io/<your-account>/fitness-tracker:latest`).
+3. In the Web App configuration add required settings (at minimum `DATABASE_URL`, JWT values, and any API keys).
+4. Use Azure Database for PostgreSQL Flexible Server (or another managed DB) and update `DATABASE_URL` accordingly.
+
+### Azure Database for PostgreSQL setup
+1. Create a flexible server (single zone) in the same region as the App Service:
+  ```bash
+  az postgres flexible-server create \
+    --resource-group <rg-name> \
+    --name <server-name> \
+    --location <region> \
+    --sku-name Standard_D2ds_v5 \
+    --tier GeneralPurpose \
+    --version 16 \
+    --admin-user fitness \
+    --admin-password <StrongPassword>
+  ```
+2. Configure a firewall rule or VNet integration so the App Service can reach the database (if both are in the same VNet, enable private access; otherwise allow the outbound IPs of the Web App).
+3. Create the database schema (the FastAPI app will auto-create tables on startup via SQLModel, so no migrations are needed yet).
+4. Build the SQLAlchemy connection string using the psycopg driver and enforced TLS:
+  ```
+  postgresql+psycopg://fitness:<password>@<server-name>.postgres.database.azure.com:5432/<database>?sslmode=require
+  ```
+5. Store this string as `DATABASE_URL` in both the Web App configuration and the GitHub repository secrets (for any workflows that need DB access, e.g., migrations).
+
+### GitHub Actions workflows
+- `.github/workflows/ci.yml` runs flake8 + pytest on every push/PR (branches `main` + `azure`). It sets `DATABASE_URL=sqlite:///./test-ci.db` so tests use an ephemeral SQLite file.
+- `.github/workflows/deploy.yml` builds the Docker image, pushes it to GitHub Container Registry, and deploys it to Azure App Service when commits land on `main`.
+
+Required GitHub secrets for deployment:
+- `AZURE_CREDENTIALS` → output of `az ad sp create-for-rbac ... --sdk-auth` with access to the target subscription/resource group.
+- `AZURE_WEBAPP_NAME` → the name of your Azure Web App for Containers.
+
+Optional secrets/env vars:
+- `DATABASE_URL` if you want to override the default inside Actions jobs.
+- `UVICORN_WORKERS`, `UVICORN_LOG_LEVEL` for custom container runtime tuning.
+
 ## Future Work
 For Assignment 2
-- Switch from SQLite → PostgreSQL for deployment
-- Dockerize services (FastAPI app, DB)
-- CI/CD integration (GitHub Actions)
+- Switch from SQLite → managed PostgreSQL in Azure and add migrations
+- Add Infrastructure-as-Code (Bicep/Terraform) for App Service + database + monitoring
+- Expand test coverage (frontend + API smoke tests) and add deployment smoke checks
 

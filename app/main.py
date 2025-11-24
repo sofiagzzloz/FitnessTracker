@@ -1,5 +1,5 @@
 from pathlib import Path
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -84,12 +84,12 @@ app.include_router(auth_router.router)  # uses /api/auth/*
 # ---- Public pages ----
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-   return templates.TemplateResponse(request, "login.html", {"user": None})
+    return templates.TemplateResponse("login.html", {"request": request, "user": None})
 
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-   return templates.TemplateResponse(request, "register.html", {"user": None})
+    return templates.TemplateResponse("register.html", {"request": request, "user": None})
 
 
 # ---- Health & Metrics ----
@@ -108,29 +108,29 @@ def metrics():
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, user: User = Depends(get_current_user)):
     if user is None:
-        return RedirectResponse("/login")
-    return templates.TemplateResponse(request, "index.html", {"user": user})
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})
 
 
 @app.get("/exercises", response_class=HTMLResponse)
 def exercises_page(request: Request, user: User = Depends(get_current_user)):
     if user is None:
-        return RedirectResponse("/login")
-    return templates.TemplateResponse(request, "exercises.html", {"user": user})
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return templates.TemplateResponse("exercises.html", {"request": request, "user": user})
 
 
 @app.get("/workouts", response_class=HTMLResponse)
 def workouts_page(request: Request, user: User = Depends(get_current_user)):
     if user is None:
-        return RedirectResponse("/login")
-    return templates.TemplateResponse(request, "workouts.html", {"user": user})
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return templates.TemplateResponse("workouts.html", {"request": request, "user": user})
 
 
 @app.get("/sessions", response_class=HTMLResponse)
 def sessions_page(request: Request, user: User = Depends(get_current_user)):
     if user is None:
-        return RedirectResponse("/login")
-    return templates.TemplateResponse(request, "sessions.html", {"user": user})
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return templates.TemplateResponse("sessions.html", {"request": request, "user": user})
 
 
 # ---- Debug helpers ----
