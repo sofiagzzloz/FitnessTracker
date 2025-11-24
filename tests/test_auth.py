@@ -114,9 +114,10 @@ def test_me_with_bad_token_returns_401(client):
 
 
 def test_html_pages_require_auth(client):
-    # Unauthed index should be 401 (your Depends(get_current_user))
-    r = client.get("/")
-    assert r.status_code == 401
+    # Unauthed index should redirect to login
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code in (302, 303)
+    assert r.headers["location"].endswith("/login")
 
     # Login
     client.post(
