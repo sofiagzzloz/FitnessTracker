@@ -32,7 +32,7 @@ document.getElementById('reg-form')?.addEventListener('submit', async (e) => {
     }
     
     alert('Registration successful! Please login.');
-    window.location.assign('/login.html');
+    window.location.assign('/login');
   } catch (err) {
     alert(err?.message || 'Network error');
   }
@@ -68,8 +68,8 @@ document.getElementById('login-form')?.addEventListener('submit', async (e) => {
     // Store user info in localStorage
     localStorage.setItem('user', JSON.stringify({ email: data.email, id: data.id }));
     
-    // Redirect to dashboard
-    window.location.assign('/index.html');
+    // Redirect to dashboard/root
+    window.location.assign('/');
   } catch (err) {
     alert(err?.message || 'Network error');
   }
@@ -87,12 +87,12 @@ async function logout() {
     localStorage.removeItem('user');
     
     // Redirect to login
-    window.location.assign('/login.html');
+    window.location.assign('/login');
   } catch (err) {
     console.error('Logout error:', err);
     // Force logout anyway
     localStorage.removeItem('user');
-    window.location.assign('/login.html');
+    window.location.assign('/login');
   }
 }
 
@@ -126,7 +126,7 @@ async function requireAuth() {
   
   if (!user) {
     // Not authenticated, redirect to login
-    window.location.assign('/login.html');
+    window.location.assign('/login');
     return null;
   }
   

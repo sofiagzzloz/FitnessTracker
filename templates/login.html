@@ -15,13 +15,21 @@
 
 <main class="wrap">
   <h1>Login</h1>
-  <section class="card" style="max-width:460px">
-    <div class="form-item"><label>Email</label><input id="email" type="email" /></div>
-    <div class="form-item"><label>Password</label><input id="pw" type="password" /></div>
-    <button id="btn-login" class="primary" type="button">Login</button>
+  <form id="login-form" class="card" style="max-width:460px">
+    <div class="form-item">
+      <label for="login-email">Email</label>
+      <input id="login-email" type="email" required placeholder="you@example.com" />
+    </div>
+    <div class="form-item">
+      <label for="login-pass">Password</label>
+      <input id="login-pass" type="password" required placeholder="••••••" />
+    </div>
+    <div class="form-item">
+      <button class="primary" type="submit">Login</button>
+    </div>
     <hr style="border:none;border-top:1px solid #222;margin:12px 0">
     <small class="hint">No account? <a href="/register">Register</a></small>
-  </section>
+  </form>
 </main>
 
 <script type="module">

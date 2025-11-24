@@ -111,11 +111,22 @@ def metrics():
 
 
 # ---- Auth-required pages ----
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request, user: User = Depends(get_current_user)):
-    if user is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+def _render_home(request: Request, user: User) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request, "user": user})
+
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request, user: User | None = Depends(get_current_user)):
+    if user is None:
+        return RedirectResponse(url="/login", status_code=303)
+    return _render_home(request, user)
+
+
+@app.get("/index.html", response_class=HTMLResponse)
+def home_alias(request: Request, user: User | None = Depends(get_current_user)):
+    if user is None:
+        return RedirectResponse(url="/login", status_code=303)
+    return _render_home(request, user)
 
 
 @app.get("/exercises", response_class=HTMLResponse)
