@@ -1,16 +1,25 @@
-from sqlmodel import SQLModel, create_engine, Session
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
 import os
 import sys
 import traceback
 
-DEFAULT_DB_URL = "postgresql+psycopg://fitness:fitness@localhost:5432/fitness"
-if "DATABASE_URL" not in os.environ:
-    raise RuntimeError("❌ DATABASE_URL is missing! Make sure it is set in Azure Container App.")
+from dotenv import load_dotenv
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+from sqlmodel import SQLModel, Session, create_engine
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+load_dotenv()
 
+DEFAULT_DB_URL = "sqlite:///./fitness.db"
+ENVIRONMENT = os.getenv("ENV", "development").lower()
+
+if os.getenv("DATABASE_URL"):
+    DATABASE_URL = os.environ["DATABASE_URL"]
+else:
+    if ENVIRONMENT == "production":
+        raise RuntimeError(
+            "DATABASE_URL is required in production. Set it to your Azure PostgreSQL connection string."
+        )
+    DATABASE_URL = DEFAULT_DB_URL
 
 print(f"🚀 Using DATABASE_URL = {DATABASE_URL}", flush=True)
 
@@ -20,8 +29,8 @@ if DATABASE_URL.startswith("sqlite"):
 
 engine = create_engine(
     DATABASE_URL,
-    echo=True,  # 👈 SHOW SQL logs
-    connect_args=connect_args
+    echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+    connect_args=connect_args,
 )
 
 # SQLite foreign keys if needed

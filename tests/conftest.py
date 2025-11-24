@@ -17,6 +17,11 @@ from app.db import get_session as prod_get_session
 
 @pytest.fixture(scope="session")
 def _test_db_url():
+    env_url = os.getenv("TEST_DATABASE_URL")
+    if env_url:
+        yield env_url
+        return
+
     fd, path = tempfile.mkstemp(prefix="ft_test_", suffix=".db")
     os.close(fd)
     try:
@@ -27,7 +32,8 @@ def _test_db_url():
 
 @pytest.fixture(scope="session")
 def _engine(_test_db_url):
-    engine = create_engine(_test_db_url, connect_args={"check_same_thread": False})
+    connect_args = {"check_same_thread": False} if _test_db_url.startswith("sqlite") else {}
+    engine = create_engine(_test_db_url, connect_args=connect_args)
     # Import models to register metadata, then create tables
     from app import models  # noqa: F401
     SQLModel.metadata.create_all(engine)

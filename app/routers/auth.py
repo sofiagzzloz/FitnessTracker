@@ -60,5 +60,7 @@ def logout(response: Response):
     return  
 
 @router.get("/me", response_model=MeOut)
-def me(user: User = Depends(get_current_user)):
+def me(user: User | None = Depends(get_current_user)):
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     return MeOut(id=user.id, email=user.email)
