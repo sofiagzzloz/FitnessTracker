@@ -50,10 +50,23 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Deploy to Azure Container App
+        env:
+          CONTAINERAPP_NAME: ${{ secrets.AZURE_CONTAINERAPP_NAME }}
+          RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          DEFAULT_CONTAINERAPP_NAME: fitness-backend
+          DEFAULT_RESOURCE_GROUP: BCSAI2025-DEVOPS-STUDENTS-A
         run: |
+          APP_NAME="${CONTAINERAPP_NAME:-$DEFAULT_CONTAINERAPP_NAME}"
+          RG_NAME="${RESOURCE_GROUP:-$DEFAULT_RESOURCE_GROUP}"
+
+          if [ -z "$APP_NAME" ] || [ -z "$RG_NAME" ]; then
+            echo "Container App name or resource group not provided." >&2
+            exit 1
+          fi
+
           az containerapp update \
-            --name ${{ secrets.AZURE_CONTAINERAPP_NAME }} \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name "$APP_NAME" \
+            --resource-group "$RG_NAME" \
             --image ${{ env.IMAGE_NAME }}:latest \
             --set-env-vars ENV=production
 
