@@ -12,7 +12,7 @@ permissions:
 env:
   ACR_NAME: fitnesstrackeracr
   ACR_LOGIN_SERVER: fitnesstrackeracr.azurecr.io
-  IMAGE_NAME: ${{ env.ACR_LOGIN_SERVER }}/fitness-tracker
+  IMAGE_NAME: fitnesstrackeracr.azurecr.io/fitness-tracker
 
 jobs:
   build-and-deploy:
