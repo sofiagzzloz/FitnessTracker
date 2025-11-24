@@ -43,17 +43,18 @@ if DATABASE_URL.startswith("sqlite"):
 
 
 def init_db() -> None:
-    print("⚙️  Running init_db()...", flush=True)
+    print("  Running init_db()...", flush=True)
     try:
         from . import models
         SQLModel.metadata.create_all(engine)
-        print("✅ init_db completed successfully!", flush=True)
+        print(" init_db completed successfully!", flush=True)
     except Exception as e:
-        print("❌ init_db FAILED:", e, flush=True)
+        print(" init_db FAILED:", e, flush=True)
         traceback.print_exc()
-        sys.exit(1)  # ❗ force crash so Azure shows logs
+        sys.exit(1)  #  force crash so Azure shows logs
 
 
 def get_session():
     with Session(engine) as session:
         yield session
+        
