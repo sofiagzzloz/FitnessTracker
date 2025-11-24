@@ -10,8 +10,9 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/fitness-tracker
+  ACR_NAME: fitnesstrackeracr
+  ACR_LOGIN_SERVER: fitnesstrackeracr.azurecr.io
+  IMAGE_NAME: ${{ env.ACR_LOGIN_SERVER }}/fitness-tracker
 
 jobs:
   build-and-deploy:
@@ -21,12 +22,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name ${{ env.ACR_NAME }}
 
       - name: Extract metadata
         id: meta
@@ -47,14 +49,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
-          images: ${{ env.IMAGE_NAME }}:latest
+      - name: Deploy to Azure Container App
+        run: |
+          az containerapp update \
+            --name ${{ secrets.AZURE_CONTAINERAPP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ env.IMAGE_NAME }}:latest \
+            --set-env-vars ENV=production
 
