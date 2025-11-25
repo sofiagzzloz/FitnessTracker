@@ -106,6 +106,12 @@ Run all tests:
 ```bash
 pytest -q
 ```
+Generate coverage (required for CI) and refresh the committed report:
+```bash
+python -m pytest --cov=app --cov-config=.coveragerc --cov-report=term-missing --cov-report=xml
+cp coverage.xml reports/coverage.xml
+```
+The latest run summary lives in `reports/TEST_REPORT.md`.
 Current test coverage:
 - Authentication: register, login, logout, /me, page access control
 - Exercises: create, import, list, delete, filter
