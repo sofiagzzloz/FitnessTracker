@@ -85,6 +85,13 @@ app.include_router(external.router)
 app.include_router(auth_router.router)  # uses /api/auth/*
 
 
+def require_user(user: User | None = Depends(get_current_user)) -> User:
+    """Dependency that ensures a logged-in user for HTML routes."""
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+
 # ---- Public pages ----
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
@@ -130,27 +137,21 @@ def home_alias(request: Request, user: User | None = Depends(get_current_user)):
 
 
 @app.get("/exercises", response_class=HTMLResponse)
-def exercises_page(request: Request, user: User = Depends(get_current_user)):
-    if user is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+def exercises_page(request: Request, user: User = Depends(require_user)):
     return templates.TemplateResponse(
         "exercises.html", {"request": request, "user": user}
     )
 
 
 @app.get("/workouts", response_class=HTMLResponse)
-def workouts_page(request: Request, user: User = Depends(get_current_user)):
-    if user is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+def workouts_page(request: Request, user: User = Depends(require_user)):
     return templates.TemplateResponse(
         "workouts.html", {"request": request, "user": user}
     )
 
 
 @app.get("/sessions", response_class=HTMLResponse)
-def sessions_page(request: Request, user: User = Depends(get_current_user)):
-    if user is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+def sessions_page(request: Request, user: User = Depends(require_user)):
     return templates.TemplateResponse(
         "sessions.html", {"request": request, "user": user}
     )
