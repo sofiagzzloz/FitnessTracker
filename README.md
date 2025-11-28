@@ -26,7 +26,7 @@ It supports authentication, exercise/workout/session management, and external ex
   - Heatmap overlays (muscle group visualization)
 - **Database**
   - User-specific data isolation (`user_id` foreign keys on exercises, workouts, sessions)
-  - SQLite in development, easily swappable to PostgreSQL
+  - SQLite for local development, PostgreSQL (Azure Database for PostgreSQL Flexible Server) for deployment
 - **Testing**
   - Pytest suite with coverage of authentication, exercises, workouts, and sessions flows
 
