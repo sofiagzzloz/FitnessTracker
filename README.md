@@ -33,45 +33,69 @@ It supports authentication, exercise/workout/session management, and external ex
 
 ## Project Structure
 ```bash
-fitness_tracker/
-├── app/
-│   ├── main.py                    
-│   ├── auth.py                    
-│   ├── db.py                      
-│   ├── models.py                  
-│   ├── schemas.py                 
-│   ├── routers/
-│   │   ├── auth.py                 
-│   │   ├── exercises.py            
-│   │   ├── workouts.py             
-│   │   ├── sessions.py            
-│   │   └── external.py            
-│   └── services/
-│       └── adapters/
-│           ├── __init__.py
-│           └── wger.py            
-├── static/
-│   ├── styles.css                  
-│   ├── auth.js                    
-│   ├── exercises.js                
-│   ├── workouts.js                
-│   ├── sessions.js                
-│   └── heatmap.js                  
-├── templates/
+.
+├── app
+│   ├── __init__.py
+│   ├── auth.py
+│   ├── db.py
+│   ├── main.py
+│   ├── models.py
+│   ├── routers
+│   │   ├── auth.py
+│   │   ├── exercises.py
+│   │   ├── external.py
+│   │   ├── sessions.py
+│   │   └── workouts.py
+│   ├── schemas.py
+│   ├── server.py
+│   └── services
+│       ├── adapters
+│       │   ├── __init__.py
+│       │   └── wger.py
+│       ├── common.py
+│       ├── exercises_service.py
+│       ├── sessions_service.py
+│       └── workouts_service.py
+├── docker
+│   ├── backend.Dockerfile
+│   ├── db-init.sql
+│   └── db.Dockerfile
+├── frontend.Dockerfile
+├── monitoring
+│   └── prometheus.yml
+├── reports
+│   ├── coverage.xml
+│   └── TEST_REPORT.md
+├── static
+│   ├── auth.js
+│   ├── config.js
+│   ├── exercises.js
+│   ├── heatmap.js
+│   ├── sessions.js
+│   ├── styles.css
+│   ├── workouts.js
+│   └── img/
+├── templates
+│   ├── exercises.html
+│   ├── index.html
 │   ├── login.html
 │   ├── register.html
-│   ├── index.html                  
-│   ├── exercises.html
-│   ├── workouts.html
-│   └── sessions.html
-├── tests/
-│   ├── conftest.py                 
-│   ├── test_auth.py                
-│   ├── test_exercises.py          
-│   └── test_workouts_and_sessions.py  
+│   ├── sessions.html
+│   └── workouts.html
+├── tests
+│   ├── conftest.py
+│   ├── test_auth.py
+│   ├── test_exercises.py
+│   ├── test_external.py
+│   ├── test_health_and_metrics.py
+│   └── test_workouts_and_sessions.py
+├── coverage.xml
+├── fitness.db
+├── nginx.conf
+├── README.md
 ├── requirements.txt
-├── .env.example                    
-└── README.md
+├── test-ci.db
+└── .env.example
 ```
 
 ## Setup Instructions
@@ -191,9 +215,4 @@ Optional secrets/env vars:
 - `DATABASE_URL` if you want to override the default inside Actions jobs.
 - `UVICORN_WORKERS`, `UVICORN_LOG_LEVEL` for custom container runtime tuning.
 
-## Future Work
-For Assignment 2
-- Switch from SQLite → managed PostgreSQL in Azure and add migrations
-- Add Infrastructure-as-Code (Bicep/Terraform) for App Service + database + monitoring
-- Expand test coverage (frontend + API smoke tests) and add deployment smoke checks
 
